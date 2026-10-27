@@ -7,12 +7,13 @@ import { useAuth } from "@/components/AuthProvider";
 
 function authMessage(error: unknown) {
   const code = error instanceof Error ? error.message : "";
-  if (code === "INVALID_CREDENTIALS") return "E-mail ou senha inválidos.";
+  if (code.includes("auth/invalid-credential") || code.includes("auth/user-not-found") || code.includes("auth/wrong-password")) return "E-mail ou senha inválidos.";
+  if (code.includes("auth/too-many-requests")) return "Muitas tentativas. Aguarde alguns minutos e tente novamente.";
   return "Não foi possível entrar. Tente novamente.";
 }
 
 export default function LoginPage() {
-  const { loginEmail } = useAuth();
+  const { signIn } = useAuth();
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,7 +26,7 @@ export default function LoginPage() {
     const email = String(data.get("email")).trim().toLowerCase();
     const password = String(data.get("password"));
     try {
-      await loginEmail(email, password);
+      await signIn(email, password);
       router.replace("/");
     } catch (loginError) {
       setError(authMessage(loginError));
@@ -37,7 +38,7 @@ export default function LoginPage() {
   return <main className="grid min-h-screen place-items-center px-5">
     <div className="w-full max-w-md rounded-3xl border border-white/10 bg-panel p-8">
       <Link href="/" className="text-sm text-gold">← Voltar</Link>
-      <h1 className="mt-8 font-sans text-5xl uppercase">Entrar</h1>
+      <h1 className="mt-8 font-sans text-4xl uppercase sm:text-5xl">Entrar</h1>
       <form onSubmit={submit} className="mt-8 grid gap-3">
         <input className="field" name="email" type="email" required autoComplete="email" placeholder="E-mail" />
         <input className="field" name="password" type="password" required autoComplete="current-password" placeholder="Senha" />

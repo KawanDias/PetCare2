@@ -7,15 +7,16 @@ import { useAuth } from "@/components/AuthProvider";
 
 function signupMessage(error: unknown) {
   const code = error instanceof Error ? error.message : "";
-  if (code === "EMAIL_IN_USE") return "Este e-mail já possui uma conta. Faça login.";
-  if (code === "INVALID_EMAIL") return "Digite um e-mail válido.";
+  if (code.includes("auth/email-already-in-use")) return "Este e-mail já possui uma conta. Faça login.";
+  if (code.includes("auth/invalid-email")) return "Digite um e-mail válido.";
+  if (code.includes("auth/weak-password")) return "A senha precisa ter pelo menos 6 caracteres.";
   if (code === "NAME_REQUIRED") return "Digite seu nome.";
   if (code === "WEAK_PASSWORD") return "A senha precisa ter pelo menos 6 caracteres.";
   return "Não foi possível criar sua conta. Tente novamente.";
 }
 
 export default function SignupPage() {
-  const { signupEmail } = useAuth();
+  const { signUp } = useAuth();
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,11 +29,10 @@ export default function SignupPage() {
     const email = String(data.get("email")).trim().toLowerCase();
     const password = String(data.get("password"));
     if (!name) { setError("Digite seu nome."); return; }
-    if (password.length < 6) { setError("A senha precisa ter pelo menos 6 caracteres."); return; }
     setLoading(true);
     try {
-      await signupEmail(name, email, password);
-      router.replace("/perfil");
+      await signUp(name, email, password);
+      router.push("/perfil");
     } catch (signupError) {
       setError(signupMessage(signupError));
     } finally {
@@ -43,7 +43,7 @@ export default function SignupPage() {
   return <main className="grid min-h-screen place-items-center px-5">
     <div className="w-full max-w-md rounded-3xl border border-white/10 bg-panel p-8">
       <Link href="/" className="text-sm text-gold">← Voltar</Link>
-      <h1 className="mt-8 font-sans text-5xl uppercase">Criar conta</h1>
+      <h1 className="mt-8 font-sans text-4xl uppercase sm:text-5xl">Criar conta</h1>
       <p className="mt-3 text-sm text-white/60">Cadastre-se com nome, e-mail e uma senha de no mínimo 6 caracteres.</p>
       <form onSubmit={submit} className="mt-8 grid gap-3">
         <input className="field" name="name" required autoComplete="name" placeholder="Nome completo" />

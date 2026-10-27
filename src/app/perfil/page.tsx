@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { CalendarDays, Camera, Check, ChevronRight, Clock3, Heart, Home, LogOut, MapPin, Shield, Star, UserRound } from "lucide-react";
 import { useAuth, type UserAddress } from "@/components/AuthProvider";
@@ -20,12 +21,19 @@ function statusClass(status: LocalBooking["status"]) { return { pending: "bg-amb
 
 export default function ProfilePage() {
   const { user, loading, updateProfile, changePassword, logout } = useAuth();
+  const router = useRouter();
   const { bookings, cancelBooking, setReminder, rateBooking } = useBookings();
   const [tab, setTab] = useState<Tab>("data");
   const [notice, setNotice] = useState("");
   const [profile, setProfile] = useState({ name: "", phone: "", cpf: "", birthDate: "" });
   const [address, setAddress] = useState<UserAddress>(emptyAddress);
   const [avatar, setAvatar] = useState<string | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
+
+  useEffect(() => {
+    if (!loading && !user) router.replace("/");
+  }, [loading, router, user]);
 
   useEffect(() => {
     if (!user) return;
@@ -39,18 +47,30 @@ export default function ProfilePage() {
   const history = userBookings.filter((booking) => booking.status === "completed" || booking.status === "cancelled" || appointmentDate(booking) <= new Date());
 
   if (loading) return <main className="grid min-h-screen place-items-center">Carregando...</main>;
-  if (!user) return <main className="grid min-h-screen place-items-center p-5"><Link href="/login" className="rounded-xl bg-gold px-5 py-3 font-bold text-ink">Entrar na conta</Link></main>;
+  if (!user) return <main className="grid min-h-screen place-items-center p-5">Redirecionando...</main>;
 
   function showNotice(message: string) { setNotice(message); window.setTimeout(() => setNotice(""), 3500); }
-  function saveProfile(event: FormEvent) {
+  async function saveProfile(event: FormEvent) {
     event.preventDefault();
-    updateProfile({ displayName: profile.name.trim(), phone: profile.phone, cpf: profile.cpf, birthDate: profile.birthDate });
-    showNotice("Seus dados foram salvos com sucesso.");
+    setSavingProfile(true);
+    try {
+      await updateProfile({ displayName: profile.name.trim(), phone: profile.phone, cpf: profile.cpf, birthDate: profile.birthDate });
+      window.location.reload();
+    } catch (error) {
+      console.error("Erro ao salvar dados do perfil:", error);
+      window.alert("Erro ao salvar dados. Tente novamente.");
+    } finally {
+      setSavingProfile(false);
+    }
   }
-  function saveAddress(event: FormEvent) {
+  async function saveAddress(event: FormEvent) {
     event.preventDefault();
-    updateProfile({ address });
-    showNotice("Endereço salvo com sucesso.");
+    try {
+      await updateProfile({ address });
+      showNotice("Endereço salvo com sucesso.");
+    } catch {
+      showNotice("Não foi possível salvar o endereço.");
+    }
   }
   function uploadAvatar(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -65,8 +85,8 @@ export default function ProfilePage() {
     };
     reader.readAsDataURL(file);
   }
-  function logoutWithConfirmation() {
-    if (window.confirm("Deseja realmente sair da sua conta?")) logout();
+  async function logoutWithConfirmation() {
+    if (window.confirm("Deseja realmente sair da sua conta?")) await logout();
   }
 
   return <main className="min-h-screen px-5 py-8 pb-20">
@@ -80,7 +100,7 @@ export default function ProfilePage() {
       <div className="mt-5 grid gap-5 lg:grid-cols-[230px_1fr]">
         <nav className="overflow-hidden rounded-3xl border border-white/10 bg-panel">{tabs.map(([id, label, Icon]) => <button key={id} type="button" onClick={() => setTab(id)} className={`flex w-full items-center gap-3 border-b border-white/10 px-4 py-3 text-left text-sm last:border-0 ${tab === id ? "bg-gold/15 text-gold" : "text-white/75"}`}><Icon size={17} /><span>{label}</span><ChevronRight size={15} className="ml-auto opacity-40" /></button>)}</nav>
         <section className="rounded-3xl border border-white/10 bg-panel p-5 md:p-7">
-          {tab === "data" && <form onSubmit={saveProfile} className="grid gap-4 sm:grid-cols-2"><SectionTitle title="Meus Dados" /><label>Nome completo<input className="field mt-2" value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} required /></label><label>Telefone / WhatsApp<input className="field mt-2" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: maskPhone(e.target.value) })} placeholder="(42) 99999-9999" /></label><label>CPF (opcional)<input className="field mt-2" value={profile.cpf} onChange={(e) => setProfile({ ...profile, cpf: e.target.value })} /></label><label>Data de nascimento<input type="date" className="field mt-2" value={profile.birthDate} onChange={(e) => setProfile({ ...profile, birthDate: e.target.value })} /></label><button className="rounded-xl bg-gold px-5 py-3 font-bold text-ink sm:col-span-2">Salvar Alterações</button></form>}
+          {tab === "data" && <form onSubmit={saveProfile} className="grid gap-4 sm:grid-cols-2"><SectionTitle title="Meus Dados" /><label>Nome completo<input className="field mt-2" value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} required /></label><label>Telefone / WhatsApp<input className="field mt-2" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: maskPhone(e.target.value) })} placeholder="(42) 99999-9999" /></label><label>CPF (opcional)<input className="field mt-2" value={profile.cpf} onChange={(e) => setProfile({ ...profile, cpf: e.target.value })} /></label><label>Data de nascimento<input type="date" className="field mt-2" value={profile.birthDate} onChange={(e) => setProfile({ ...profile, birthDate: e.target.value })} /></label><button disabled={savingProfile} className="rounded-xl bg-gold px-5 py-3 font-bold text-ink disabled:cursor-not-allowed disabled:opacity-70 sm:col-span-2">{savingProfile ? "Salvando..." : profileSaved ? "Salvo com sucesso!" : "Salvar Alterações"}</button></form>}
           {tab === "access" && <AccessPanel user={user} onLogout={logoutWithConfirmation} />}
           {tab === "security" && <SecurityPanel onChange={changePassword} onNotice={showNotice} />}
           {tab === "address" && <AddressPanel address={address} setAddress={setAddress} onSave={saveAddress} onNotice={showNotice} />}

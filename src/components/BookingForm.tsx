@@ -1,6 +1,8 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
+import type { MouseEvent } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { services } from "@/lib/services";
 import { useAuth } from "@/components/AuthProvider";
 import { useBookings } from "@/components/BookingProvider";
@@ -12,6 +14,34 @@ export function BookingForm({ initialServiceId }: { initialServiceId?: string })
   const [loading, setLoading] = useState(false);
   const availableDays = getAvailableDays();
   const [selectedDate, setSelectedDate] = useState(availableDays[0]?.value ?? "");
+  const [isDraggingDays, setIsDraggingDays] = useState(false);
+  const daysScrollerRef = useRef<HTMLDivElement>(null);
+  const dragState = useRef({ active: false, startX: 0, startScrollLeft: 0, moved: false });
+  function scrollDays(direction: number) {
+    daysScrollerRef.current?.scrollBy({ left: direction * 260, behavior: "smooth" });
+  }
+  function handleDragStart(event: MouseEvent<HTMLDivElement>) {
+    if (event.button !== 0 || !daysScrollerRef.current) return;
+    dragState.current = { active: true, startX: event.clientX, startScrollLeft: daysScrollerRef.current.scrollLeft, moved: false };
+    setIsDraggingDays(true);
+  }
+  function handleDragMove(event: MouseEvent<HTMLDivElement>) {
+    if (!dragState.current.active || !daysScrollerRef.current) return;
+    const distance = event.clientX - dragState.current.startX;
+    if (Math.abs(distance) > 4) dragState.current.moved = true;
+    daysScrollerRef.current.scrollLeft = dragState.current.startScrollLeft - distance;
+  }
+  function handleDragEnd() {
+    dragState.current.active = false;
+    setIsDraggingDays(false);
+  }
+  function selectDay(value: string) {
+    if (dragState.current.moved) {
+      dragState.current.moved = false;
+      return;
+    }
+    setSelectedDate(value);
+  }
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setLoading(true); setMessage("");
@@ -34,25 +64,37 @@ export function BookingForm({ initialServiceId }: { initialServiceId?: string })
       setMessage(error instanceof Error ? error.message : "Não foi possível reservar o horário.");
     } finally { setLoading(false); }
   }
-  return <form onSubmit={submit} className="grid gap-3 rounded-3xl border border-white/10 bg-panel p-5 shadow-xl md:grid-cols-2">
+  return <form onSubmit={submit} className="grid min-w-0 gap-3 rounded-3xl border border-white/10 bg-panel p-4 shadow-xl sm:p-5 md:grid-cols-2">
     <input name="name" required placeholder="Seu nome" className="field" />
     <input name="phone" required placeholder="WhatsApp" className="field" />
     <input name="email" type="email" placeholder="E-mail (opcional)" className="field" />
     <select name="service" defaultValue={initialServiceId} className="field">{services.map((s) => <option key={s.id} value={s.id}>{s.name} - R$ {(s.priceCents / 100).toFixed(2)} ({s.durationMinutes} min)</option>)}</select>
     <select name="professional" className="field"><option value="fernando">Fernando · Especialista</option></select>
-    <div className="md:col-span-2">
-      <div className="mb-2 flex items-center justify-between">
+    <div className="min-w-0 md:col-span-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-1">
         <label className="text-sm font-semibold text-white/80">Escolha o dia</label>
         <span className="text-xs text-white/50">Dias disponíveis para atendimento</span>
       </div>
       <input name="date" type="hidden" value={selectedDate} required />
-      <div className="flex gap-2 overflow-x-auto pb-2" aria-label="Dias disponíveis">
+      <div className="flex items-center gap-2">
+        <button type="button" aria-label="Dias anteriores" onClick={() => scrollDays(-1)} className="hidden shrink-0 rounded-full border border-white/10 bg-ink p-2 text-white/60 transition hover:border-gold hover:text-gold md:inline-flex">
+          <ChevronLeft size={18} />
+        </button>
+        <div
+          ref={daysScrollerRef}
+          className={`flex w-full max-w-full min-w-0 space-x-3 overflow-x-auto overscroll-x-contain pb-2 no-scrollbar md:cursor-grab ${isDraggingDays ? "md:cursor-grabbing" : ""}`}
+          aria-label="Dias disponíveis"
+          onMouseDown={handleDragStart}
+          onMouseMove={handleDragMove}
+          onMouseUp={handleDragEnd}
+          onMouseLeave={handleDragEnd}
+        >
         {availableDays.map((day) => (
           <button
             key={day.value}
             type="button"
-            onClick={() => setSelectedDate(day.value)}
-            className={`min-w-[76px] rounded-2xl border px-3 py-3 text-center transition-all duration-300 ${
+            onClick={() => selectDay(day.value)}
+            className={`w-20 min-w-[75px] flex-shrink-0 rounded-2xl border px-3 py-3 text-center transition-all duration-300 ${
               selectedDate === day.value
                 ? "border-gold bg-gold text-ink shadow-lg shadow-amber-500/20"
                 : "border-white/10 bg-ink text-white/70 hover:border-gold/60 hover:text-gold"
@@ -63,14 +105,18 @@ export function BookingForm({ initialServiceId }: { initialServiceId?: string })
             <span className="block text-[11px] uppercase">{day.month}</span>
           </button>
         ))}
+        </div>
+        <button type="button" aria-label="Próximos dias" onClick={() => scrollDays(1)} className="hidden shrink-0 rounded-full border border-white/10 bg-ink p-2 text-white/60 transition hover:border-gold hover:text-gold md:inline-flex">
+          <ChevronRight size={18} />
+        </button>
       </div>
       {selectedDate && <p className="mt-2 text-xs text-gold">Dia selecionado: {formatSelectedDate(selectedDate)}</p>}
     </div>
     <select name="time" required className="field">{["09:00","10:00","11:00","13:00","14:00","15:00","16:00","17:00","18:00"].map((time) => <option key={time}>{time}</option>)}</select>
-    <fieldset className="md:col-span-2 grid gap-2 sm:grid-cols-2">
+    <fieldset className="min-w-0 md:col-span-2 grid gap-2 sm:grid-cols-2">
       <legend className="mb-1 text-sm text-white/60">Forma de pagamento</legend>
-      <label className="rounded-xl border border-white/10 p-3 text-sm"><input type="radio" name="payment" value="pending" defaultChecked className="mr-2" />Agendar e Pagar no Local</label>
-      <label className="rounded-xl border border-white/10 p-3 text-sm"><input type="radio" name="payment" value="paid" className="mr-2" />Pagar Agora (Antecipado)</label>
+      <label className="flex min-w-0 items-start gap-2 rounded-xl border border-white/10 p-3 text-sm"><input type="radio" name="payment" value="pending" defaultChecked className="mt-0.5 shrink-0" /><span>Agendar e Pagar no Local</span></label>
+      <label className="flex min-w-0 items-start gap-2 rounded-xl border border-white/10 p-3 text-sm"><input type="radio" name="payment" value="paid" className="mt-0.5 shrink-0" /><span>Pagar Agora (Antecipado)</span></label>
     </fieldset>
     <button disabled={loading || !selectedDate} className="md:col-span-2 rounded-xl bg-gold px-5 py-3 font-bold text-ink transition-all duration-300 ease-in-out hover:scale-[1.02] hover:shadow-lg hover:shadow-amber-500/20 disabled:cursor-not-allowed disabled:opacity-50">{loading ? "Reservando..." : "Confirmar agendamento"}</button>
     {message && <p role="status" className="md:col-span-2 text-sm text-white/70">{message}</p>}
