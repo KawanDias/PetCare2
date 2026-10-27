@@ -1,9 +1,10 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import type { MouseEvent } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { services } from "@/lib/services";
+import { onValue, ref } from "firebase/database";
+import { database } from "@/lib/firebase";
 import { useAuth } from "@/components/AuthProvider";
 import { useBookings } from "@/components/BookingProvider";
 
@@ -12,6 +13,11 @@ export function BookingForm({ initialServiceId }: { initialServiceId?: string })
   const { createBooking } = useBookings();
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [services, setServices] = useState<Service[]>([]);
+  useEffect(() => onValue(ref(database, "services"), (snapshot) => {
+    const value = snapshot.val() as Record<string, Omit<Service, "id">> | null;
+    setServices(Object.entries(value ?? {}).map(([id, item]) => ({ id, ...item })));
+  }), []);
   const availableDays = getAvailableDays();
   const [selectedDate, setSelectedDate] = useState(availableDays[0]?.value ?? "");
   const [isDraggingDays, setIsDraggingDays] = useState(false);
@@ -47,7 +53,7 @@ export function BookingForm({ initialServiceId }: { initialServiceId?: string })
     setLoading(true); setMessage("");
     const data = new FormData(e.currentTarget);
     const service = services.find((item) => item.id === data.get("service"));
-    if (!service) return setLoading(false);
+    if (!service) { setMessage("Nenhum serviço disponível para agendamento."); setLoading(false); return; }
     if (!user) { setMessage("Entre na sua conta para reservar e acompanhar o agendamento."); setLoading(false); return; }
     try {
       const paymentStatus = String(data.get("payment")) as "pending" | "paid";
@@ -68,7 +74,7 @@ export function BookingForm({ initialServiceId }: { initialServiceId?: string })
     <input name="name" required placeholder="Seu nome" className="field" />
     <input name="phone" required placeholder="WhatsApp" className="field" />
     <input name="email" type="email" placeholder="E-mail (opcional)" className="field" />
-    <select name="service" defaultValue={initialServiceId} className="field">{services.map((s) => <option key={s.id} value={s.id}>{s.name} - R$ {(s.priceCents / 100).toFixed(2)} ({s.durationMinutes} min)</option>)}</select>
+    <select name="service" defaultValue={initialServiceId} className="field" required disabled={services.length === 0}><option value="">{services.length ? "Selecione um serviço" : "Nenhum serviço disponível"}</option>{services.map((s) => <option key={s.id} value={s.id}>{s.name} - R$ {(s.priceCents / 100).toFixed(2)} ({s.durationMinutes} min)</option>)}</select>
     <select name="professional" className="field"><option value="fernando">Fernando · Especialista</option></select>
     <div className="min-w-0 md:col-span-2">
       <div className="mb-2 flex flex-wrap items-center justify-between gap-1">
@@ -122,6 +128,8 @@ export function BookingForm({ initialServiceId }: { initialServiceId?: string })
     {message && <p role="status" className="md:col-span-2 text-sm text-white/70">{message}</p>}
   </form>;
 }
+
+type Service = { id: string; name: string; priceCents: number; durationMinutes: number; category: string };
 
 function getAvailableDays() {
   const days: Array<{ value: string; weekday: string; day: string; month: string }> = [];

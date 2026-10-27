@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Heart } from "lucide-react";
 import { formatPrice, PortfolioItem } from "@/lib/catalog-data";
-import { PLACEHOLDER_IMAGE } from "@/data/mockData";
+import { PLACEHOLDER_IMAGE } from "@/lib/mockData";
 import { useAuth } from "@/components/AuthProvider";
 
 export function PortfolioCard({ item }: { item: PortfolioItem }) {

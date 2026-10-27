@@ -1,0 +1,40 @@
+{
+  "rules": {
+    "products": {
+      ".read": true,
+      "$productId": {
+        ".write": "auth != null"
+      }
+    },
+    "gallery": {
+      ".read": true,
+      "$galleryId": {
+        ".write": "auth != null"
+      }
+    },
+    "services": {
+      ".read": true,
+      "$serviceId": {
+        ".write": "auth != null"
+      }
+    },
+    "professionals": {
+      ".read": true,
+      "$professionalId": {
+        ".write": "auth != null"
+      }
+    },
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "appointments": {
+      "$appointmentId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    }
+  }
+}

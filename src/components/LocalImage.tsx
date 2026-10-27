@@ -1,7 +1,7 @@
 "use client";
 
 import type { ImgHTMLAttributes } from "react";
-import { PLACEHOLDER_IMAGE } from "@/data/mockData";
+import { PLACEHOLDER_IMAGE } from "@/lib/mockData";
 
 type LocalImageProps = ImgHTMLAttributes<HTMLImageElement>;
 
