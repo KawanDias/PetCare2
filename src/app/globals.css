@@ -1,13 +1,13 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-:root { color-scheme: dark; }
+:root { color-scheme: light; }
 html, body { max-width: 100%; overflow-x: hidden; font-family: var(--font-inter), Inter, Arial, sans-serif; }
-body { @apply bg-ink text-white; }
+body { @apply bg-cream text-stone-800; }
 *, *::before, *::after { box-sizing: border-box; }
 img, svg, video, canvas { max-width: 100%; }
 .breakable-content { overflow-wrap: anywhere; }
-.field { @apply w-full rounded-xl border border-white/10 bg-ink/70 px-4 py-3 text-white outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/30; }
-.field option { @apply bg-ink text-white; }
+.field { @apply w-full rounded-xl border border-stone-200 bg-white px-4 py-3 text-stone-800 outline-none transition focus:border-gold focus:ring-2 focus:ring-gold/30; }
+.field option { @apply bg-white text-stone-800; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }

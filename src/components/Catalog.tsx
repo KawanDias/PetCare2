@@ -1,17 +1,13 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
-import { onValue, ref } from "firebase/database";
-import { CatalogCard } from "@/components/CatalogCard";
-import { Product } from "@/lib/catalog-data";
-import { database } from "@/lib/firebase";
+import Link from "next/link";
+import { Pet } from "@/lib/catalog-data";
+import { PetCard } from "@/components/PetCard";
+import { apiFetch } from "@/lib/api";
 
 export function Catalog() {
-  const [products, setProducts] = useState<Product[]>([]);
-  useEffect(() => onValue(ref(database, "products"), (snapshot) => {
-    const value = snapshot.val() as Record<string, Omit<Product, "id">> | null;
-    setProducts(Object.entries(value ?? {}).map(([id, item]) => ({ id, ...item })).filter((item) => item.emDestaque));
-  }), []);
-  return <section className="mx-auto max-w-6xl px-5 py-16"><div className="flex items-end justify-between gap-4"><div><p className="font-semibold uppercase tracking-widest text-gold">Na bancada</p><h2 className="mt-2 font-sans text-4xl uppercase">Produtos do Pongo</h2></div><Link href="/produtos" className="text-sm text-gold">Ver todos →</Link></div><div className="mt-8 grid gap-4 sm:grid-cols-3">{products.slice(0, 3).map((product) => <CatalogCard key={product.id} product={product} />)}</div>{products.length === 0 && <p className="mt-8 text-white/60">Nenhum produto cadastrado.</p>}</section>;
+  const [pets, setPets] = useState<Pet[]>([]);
+  useEffect(() => { void apiFetch<Pet[]>("/api/pets").then((items) => setPets(items.filter((item) => item.emDestaque))).catch((error) => console.error("Erro ao carregar pets em destaque.", error)); }, []);
+  return <section className="mx-auto max-w-6xl px-5 py-16"><div className="flex items-end justify-between gap-4"><div><p className="font-semibold uppercase tracking-widest text-gold">Encontre um amigo</p><h2 className="mt-2 font-sans text-4xl uppercase">Pets em destaque</h2></div><Link href="/pets" className="text-sm text-gold">Ver todos →</Link></div><div className="mt-8 grid gap-4 sm:grid-cols-3">{pets.slice(0, 3).map((pet) => <PetCard key={pet.id} pet={pet} />)}</div>{pets.length === 0 && <p className="mt-8 text-stone-600">Nenhum pet em destaque no momento.</p>}</section>;
 }

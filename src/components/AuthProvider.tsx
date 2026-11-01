@@ -11,10 +11,10 @@ import {
   updatePassword,
   type User as FirebaseUser
 } from "firebase/auth";
-import { get, ref, set, update } from "firebase/database";
-import { auth, database, type UserRole } from "@/lib/firebase";
+import { auth, type UserRole } from "@/lib/firebase";
+import { apiFetch } from "@/lib/api";
 
-export const ADMIN_EMAIL = "barbeariapongo@gmail.com";
+export const ADMIN_EMAIL = "kawangoleiro79@gmail.com";
 
 export type UserAddress = {
   cep: string;
@@ -27,7 +27,7 @@ export type UserAddress = {
 
 export type FavoriteItem = {
   id: string;
-  type: "product" | "portfolio";
+  type: "product" | "portfolio" | "pet";
   name: string;
   imageUrl: string;
   priceCents: number;
@@ -73,13 +73,13 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 function isAdmin(email: string | null) {
-  return email?.toLowerCase() === ADMIN_EMAIL;
+  return Boolean(ADMIN_EMAIL) && email?.toLowerCase() === ADMIN_EMAIL;
 }
 
 function toLocalUser(firebaseUser: FirebaseUser, profile: UserProfile | undefined): LocalUser {
   return {
     uid: firebaseUser.uid,
-    displayName: profile?.displayName ?? profile?.nome ?? firebaseUser.displayName ?? "Cliente Pongo",
+    displayName: profile?.displayName ?? profile?.nome ?? firebaseUser.displayName ?? "Cliente PetCare",
     email: firebaseUser.email ?? profile?.email ?? "",
     photoURL: profile?.photoURL ?? firebaseUser.photoURL ?? null,
     phone: profile?.phone ?? profile?.telefone,
@@ -92,8 +92,7 @@ function toLocalUser(firebaseUser: FirebaseUser, profile: UserProfile | undefine
 }
 
 async function readProfile(firebaseUser: FirebaseUser) {
-  const snapshot = await get(ref(database, `users/${firebaseUser.uid}`));
-  return snapshot.exists() ? snapshot.val() as UserProfile : undefined;
+  return apiFetch<UserProfile | null>("/api/profile").then((profile) => profile ?? undefined);
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -124,13 +123,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const nextProfile = {
             uid: firebaseUser.uid,
             email: firebaseUser.email ?? "",
-            displayName: profile?.displayName ?? profile?.nome ?? firebaseUser.displayName ?? "Cliente Pongo",
+            displayName: profile?.displayName ?? profile?.nome ?? firebaseUser.displayName ?? "Cliente PetCare",
             photoURL: profile?.photoURL ?? firebaseUser.photoURL ?? "",
             favorites: profile?.favorites ?? [],
             lastLoginAt,
             role: profileRole
           };
-          await update(ref(database, `users/${firebaseUser.uid}`), nextProfile);
+          await apiFetch("/api/profile", { method: "PATCH", body: JSON.stringify(nextProfile) });
           if (auth.currentUser?.uid !== firebaseUser.uid) return;
           setUser(toLocalUser(firebaseUser, { ...profile, ...nextProfile }));
           setRole(profileRole);
@@ -148,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!name.trim()) throw new Error("NAME_REQUIRED");
     const credentials = await createUserWithEmailAndPassword(auth, email.trim().toLowerCase(), password);
     await updateFirebaseProfile(credentials.user, { displayName: name.trim() });
-    await set(ref(database, `users/${credentials.user.uid}`), {
+    await apiFetch("/api/profile", { method: "PUT", body: JSON.stringify({
       uid: credentials.user.uid,
       nome: name.trim(),
       displayName: name.trim(),
@@ -160,7 +159,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       favorites: [],
       role: "cliente",
       createdAt: new Date().toISOString()
-    });
+    }) });
     setUser({
       uid: credentials.user.uid,
       displayName: name.trim(),
@@ -211,7 +210,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (changes.displayName !== undefined && auth.currentUser) {
         await updateFirebaseProfile(auth.currentUser, { displayName: changes.displayName });
       }
-      await update(ref(database, `users/${user.uid}`), firestoreChanges);
+      await apiFetch("/api/profile", { method: "PATCH", body: JSON.stringify(firestoreChanges) });
       setUser({ ...user, ...changes });
     },
     changePassword: async (_currentPassword, newPassword) => {
@@ -224,7 +223,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const favorites = user.favorites.some((favorite) => favorite.id === item.id && favorite.type === item.type)
         ? user.favorites.filter((favorite) => !(favorite.id === item.id && favorite.type === item.type))
         : [...user.favorites, item];
-      await update(ref(database, `users/${user.uid}`), { favorites });
+      await apiFetch("/api/profile", { method: "PATCH", body: JSON.stringify({ favorites }) });
       setUser({ ...user, favorites });
     }
   }), [loading, role, router, user]);

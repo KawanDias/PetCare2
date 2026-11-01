@@ -4,7 +4,7 @@ const config: Config = {
   content: ["./src/pages/**/*.{ts,tsx}", "./src/components/**/*.{ts,tsx}", "./src/app/**/*.{ts,tsx}"],
   theme: {
     extend: {
-      colors: { ink: "#0b0d0f", panel: "#15191d", gold: "#d5a54a", cream: "#f8f5ef", price: "#62d391" },
+      colors: { ink: "#F4F5F7", panel: "#FFFFFF", gold: "#B4533A", cream: "#F4F5F7", price: "#9A3412" },
       fontFamily: { sans: ["var(--font-inter)", "Inter", "Arial", "sans-serif"] }
     }
   },

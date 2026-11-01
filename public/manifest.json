@@ -1,15 +1,15 @@
 {
-  "name": "A Barbearia do Pongo",
-  "short_name": "Barbearia Pongo",
-  "description": "Agende seu corte e confira as novidades da Barbearia do Pongo.",
+  "name": "PetCare",
+  "short_name": "PetCare",
+  "description": "Encontre seu novo melhor amigo.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#151515",
-  "theme_color": "#151515",
+  "background_color": "#FDFBF7",
+  "theme_color": "#C76D4B",
   "lang": "pt-BR",
   "icons": [
     {
-      "src": "/logo-pongo.png",
+      "src": "/logo-petcare.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

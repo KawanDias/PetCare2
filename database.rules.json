@@ -1,39 +1,59 @@
 {
   "rules": {
+    ".read": false,
+    ".write": false,
+    "pets": {
+      ".read": true,
+      "$petId": {
+        ".write": "auth != null && auth.token.email == 'kawangoleiro79@gmail.com'"
+      }
+    },
     "products": {
       ".read": true,
       "$productId": {
-        ".write": "auth != null"
+        ".write": "auth != null && auth.token.email == 'kawangoleiro79@gmail.com'"
       }
     },
     "gallery": {
       ".read": true,
       "$galleryId": {
-        ".write": "auth != null"
+        ".write": "auth != null && auth.token.email == 'kawangoleiro79@gmail.com'"
       }
     },
     "services": {
       ".read": true,
       "$serviceId": {
-        ".write": "auth != null"
+        ".write": "auth != null && auth.token.email == 'kawangoleiro79@gmail.com'"
       }
     },
     "professionals": {
       ".read": true,
       "$professionalId": {
-        ".write": "auth != null"
+        ".write": "auth != null && auth.token.email == 'kawangoleiro79@gmail.com'"
       }
     },
     "users": {
       "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid"
+        ".read": "auth != null && (auth.uid == $uid || auth.token.email == 'kawangoleiro79@gmail.com')",
+        ".write": "auth != null && (auth.token.email == 'kawangoleiro79@gmail.com' || (auth.uid == $uid && (!data.exists() ? newData.child('role').val() == 'cliente' : (newData.child('role').val() == data.child('role').val() || (data.child('role').val() == null && newData.child('role').val() == 'cliente')))))",
+        "adoptionRequests": {
+          "$requestId": {
+            ".read": "auth != null && (auth.uid == $uid || auth.token.email == 'kawangoleiro79@gmail.com')",
+            ".write": "auth != null && (auth.uid == $uid || auth.token.email == 'kawangoleiro79@gmail.com')"
+          }
+        }
       }
     },
     "appointments": {
       "$appointmentId": {
-        ".read": "auth != null",
-        ".write": "auth != null"
+        ".read": "auth != null && auth.token.email == 'kawangoleiro79@gmail.com'",
+        ".write": "auth != null && auth.token.email == 'kawangoleiro79@gmail.com'"
+      }
+    },
+    "bookings": {
+      "$bookingId": {
+        ".read": "auth != null && (auth.token.email == 'kawangoleiro79@gmail.com' || data.child('customerId').val() == auth.uid)",
+        ".write": "auth != null && (auth.token.email == 'kawangoleiro79@gmail.com' || (!data.exists() && newData.child('customerId').val() == auth.uid))"
       }
     }
   }

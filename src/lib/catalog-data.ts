@@ -13,6 +13,26 @@ export type Product = {
 
 export const PRODUCT_CATEGORIES = ["Pomadas", "Shampoos", "Acessórios", "Outros"] as const;
 
+export type Pet = {
+  id: string;
+  name: string;
+  species: "Cachorro" | "Gato" | "Aves" | "Outros" | string;
+  breed: string;
+  age: string;
+  size: "Pequeno" | "Médio" | "Grande" | string;
+  sex: "Fêmea" | "Macho" | string;
+  coat: string;
+  vaccinated: "Sim" | "Não" | string;
+  neutered: "Sim" | "Não" | string;
+  dewormed: "Sim" | "Não" | string;
+  temperament: string;
+  description: string;
+  imageUrls: string[];
+  images?: string[];
+  image?: string;
+  emDestaque: boolean;
+};
+
 export type PortfolioItem = {
   id: string;
   name: string;

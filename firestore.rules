@@ -11,7 +11,7 @@ service cloud.firestore {
         && request.resource.data.customerPhone is string
         && request.resource.data.date is string
         && request.resource.data.time is string;
-      allow read: if request.auth != null && (request.auth.uid == resource.data.customerId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
+      allow read: if request.auth != null && (request.auth.uid == resource.data.customerId || isAdmin(database));
       allow update: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin";
     }
     match /services/{id} { allow read: if true; allow write: if isAdmin(database); }
@@ -20,8 +20,8 @@ service cloud.firestore {
     match /availability/{id} { allow read: if true; allow write: if isAdmin(database); }
     match /professionals/{id} { allow read: if true; allow write: if isAdmin(database); }
     match /customers/{id} { allow read, write: if request.auth != null && request.auth.uid == id; }
-  }
-  function isAdmin(database) {
-    return request.auth != null && (request.auth.token.email == "barbeariapongo@gmail.com" || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "admin");
+    function isAdmin(database) {
+      return request.auth != null && request.auth.token.email == "kawangoleiro79@gmail.com";
+    }
   }
 }

@@ -1,12 +1,12 @@
 export const business = {
-  name: "A Barbearia do Pongo",
+  name: "PetCare",
   phone: "5542999559516",
   displayPhone: "(42) 99955-9516",
-  address: "Rua Campina Alta, 159 - Parque Limeira Área 02, Telêmaco Borba - PR, 84267-000",
-  mapsQuery: "A Barbearia do Pongo, Rua Campina Alta, 159, Telêmaco Borba - PR",
-  hours: "Terça a sábado, das 9h às 19h"
+  address: "Atendimento para adoção responsável em Telêmaco Borba - PR",
+  mapsQuery: "PetCare, Telêmaco Borba - PR",
+  hours: "Atendimento mediante contato"
 };
 
-export function whatsappLink(message = "Olá! Gostaria de agendar um horário na Barbearia do Pongo.") {
+export function whatsappLink(message = "Olá! Gostaria de conhecer os pets disponíveis para adoção.") {
   return `https://wa.me/${business.phone}?text=${encodeURIComponent(message)}`;
 }
