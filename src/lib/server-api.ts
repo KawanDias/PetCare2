@@ -1,7 +1,19 @@
 import { NextRequest } from "next/server";
 
 export const ADMIN_EMAIL = "kawangoleiro79@gmail.com";
-const databaseUrl = (process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL?.trim().replace(/^['"]|['"]$/g, "").trim() || "https://petcare-bf251-default-rtdb.firebaseio.com").replace(/\/$/, "");
+const DEFAULT_DATABASE_URL = "https://petcare-bf251-default-rtdb.firebaseio.com";
+
+function getDatabaseUrl() {
+  const configured = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL?.trim().replace(/^['"]|['"]$/g, "").trim();
+  if (!configured) return DEFAULT_DATABASE_URL;
+  try {
+    const url = new URL(configured);
+    if (url.protocol !== "https:" || !url.hostname) return DEFAULT_DATABASE_URL;
+    return configured.replace(/\/$/, "");
+  } catch {
+    return DEFAULT_DATABASE_URL;
+  }
+}
 
 type FirebaseIdentity = { localId: string; email?: string };
 
@@ -39,10 +51,9 @@ export async function requireAdmin(request: NextRequest) {
 }
 
 export async function databaseRequest<T>(path: string, init: RequestInit = {}, token?: string) {
-  if (!databaseUrl) throw new ApiError(500, "URL do Realtime Database não configurada.");
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json");
-  const url = new URL(`${databaseUrl}/${path}.json`);
+  const url = new URL(`${getDatabaseUrl()}/${path}.json`);
   if (token) url.searchParams.set("access_token", token);
   const response = await fetch(url, { ...init, headers, cache: "no-store" });
   const body = await response.json().catch(() => null) as T | { error?: string } | null;
