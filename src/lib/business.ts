@@ -1,7 +1,7 @@
 export const business = {
   name: "PetCare",
-  phone: "5542999559516",
-  displayPhone: "(42) 99955-9516",
+  phone: "5542984112985",
+  displayPhone: "(42) 98411-2985",
   address: "Atendimento para adoção responsável em Telêmaco Borba - PR",
   mapsQuery: "PetCare, Telêmaco Borba - PR",
   hours: "Atendimento mediante contato"
