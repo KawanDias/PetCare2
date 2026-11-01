@@ -9,6 +9,7 @@ import { PLACEHOLDER_IMAGE } from "@/lib/mockData";
 export function PetCard({ pet }: { pet: Pet }) {
   const { user, toggleFavorite } = useAuth();
   const petId = pet.id || String((pet as Pet & { key?: string }).key ?? "");
+  if (!petId) return null;
   const image = pet.imageUrls?.[0] ?? pet.images?.[0] ?? pet.image ?? PLACEHOLDER_IMAGE;
   const favorite = Boolean(user?.favorites.some((item) => item.id === petId && item.type === "pet"));
   async function handleFavorite(event: React.MouseEvent<HTMLButtonElement>) {
