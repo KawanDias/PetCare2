@@ -13,10 +13,18 @@ import { whatsappLink } from "@/lib/business";
 export default function PetDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const [pet, setPet] = useState<Pet | null>(null);
+  const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const { user } = useAuth();
-  useEffect(() => { void apiFetch<Pet>(`/api/pets/${encodeURIComponent(id)}`).then(setPet).catch((error) => { if (error instanceof Error && error.message === "Pet não encontrado.") setPet(null); else console.error("Erro ao carregar pet.", error); }); }, [id]);
+  useEffect(() => {
+    setLoading(true);
+    setPet(null);
+    void apiFetch<Pet>(`/api/pets/${encodeURIComponent(id)}`)
+      .then(setPet)
+      .catch((error) => { if (error instanceof Error && error.message !== "Pet não encontrado.") console.error("Erro ao carregar pet.", error); })
+      .finally(() => setLoading(false));
+  }, [id]);
   const images = pet?.imageUrls?.length ? pet.imageUrls : pet?.images?.length ? pet.images : pet?.image ? [pet.image] : ["/samples/placeholder.svg"];
   const currentImage = images[Math.min(selectedImage, images.length - 1)];
   const moveImage = (direction: number) => setSelectedImage((index) => (index + direction + images.length) % images.length);
@@ -26,6 +34,7 @@ export default function PetDetailPage({ params }: { params: Promise<{ id: string
     document.addEventListener("keydown", handleKeyDown); document.body.style.overflow = "hidden";
     return () => { document.removeEventListener("keydown", handleKeyDown); document.body.style.overflow = ""; };
   }, [lightboxOpen]);
+  if (loading) return <><Header /><main className="mx-auto min-h-screen max-w-5xl px-5 py-12"><Link href="/pets" className="text-sm text-gold">← Pets para adoção</Link><div className="mt-8 animate-pulse space-y-4"><div className="h-8 w-48 rounded bg-stone-200" /><div className="h-4 w-72 rounded bg-stone-200" /><div className="h-48 rounded-xl bg-stone-200" /></div></main></>;
   if (!pet) return <><Header /><main className="mx-auto min-h-screen max-w-5xl px-5 py-12"><Link href="/pets" className="text-sm text-gold">← Pets para adoção</Link><p className="mt-8 text-stone-600">Pet não encontrado.</p></main></>;
   const petData = pet;
   const detail = [["Espécie", pet.species], ["Raça", pet.breed], ["Idade", pet.age], ["Porte", pet.size], ["Sexo", pet.sex], ["Cor / Pelagem", pet.coat], ["Vacinado", pet.vaccinated], ["Castrado", pet.neutered], ["Vermifugado", pet.dewormed]];
