@@ -33,6 +33,7 @@
       }
     },
     "users": {
+      ".read": "auth != null && auth.token.email == 'kawangoleiro79@gmail.com'",
       "$uid": {
         ".read": "auth != null && (auth.uid == $uid || auth.token.email == 'kawangoleiro79@gmail.com')",
         ".write": "auth != null && (auth.token.email == 'kawangoleiro79@gmail.com' || (auth.uid == $uid && (!data.exists() ? newData.child('role').val() == 'cliente' : (newData.child('role').val() == data.child('role').val() || (data.child('role').val() == null && newData.child('role').val() == 'cliente')))))",
@@ -59,6 +60,7 @@
       }
     },
     "solicitacoes": {
+      ".read": "auth != null && auth.token.email == 'kawangoleiro79@gmail.com'",
       "$requestId": {
         ".read": "auth != null && (data.child('userId').val() == auth.uid || data.child('uid').val() == auth.uid || auth.token.email == 'kawangoleiro79@gmail.com')",
         ".write": "auth != null && (auth.token.email == 'kawangoleiro79@gmail.com' || ((!data.exists() && (newData.child('userId').val() == auth.uid || newData.child('uid').val() == auth.uid)) || (data.child('userId').val() == auth.uid || data.child('uid').val() == auth.uid)))",

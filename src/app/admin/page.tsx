@@ -2,11 +2,13 @@
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Check, Edit3, Inbox, MessageCircle, PawPrint, Plus, Search, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Check, Edit3, Inbox, MessageCircle, PawPrint, Plus, Search, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Pet } from "@/lib/catalog-data";
 import { apiFetch } from "@/lib/api";
+import { NotificationBell } from "@/components/NotificationBell";
 
 function fileToBase64(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -109,10 +111,18 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (!user || role !== "admin") return;
-    void Promise.all([apiFetch<Pet[]>("/api/pets"), apiFetch<AdoptionRequest[]>("/api/adoptions")])
-      .then(([loadedPets, loadedRequests]) => { setPets(loadedPets); setRequests(loadedRequests); })
-      .catch((error) => { console.error("Erro ao carregar dados administrativos.", error); setMessage("Não foi possível carregar os dados do painel."); });
+    void apiFetch<Pet[]>("/api/pets")
+      .then(setPets)
+      .catch((error) => { console.error("Erro ao carregar pets do painel.", error); setMessage("Não foi possível carregar os pets."); });
+    void apiFetch<AdoptionRequest[]>("/api/adoptions")
+      .then(setRequests)
+      .catch((error) => { console.error("Erro ao carregar solicitações do painel.", error); setMessage("Não foi possível carregar as solicitações."); });
   }, [role, user]);
+
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab === "adoptions" || tab === "create" || tab === "pets") setActiveTab(tab);
+  }, []);
 
   const filteredPets = useMemo(() => pets.filter((pet) => pet.name.toLowerCase().includes(search.toLowerCase())), [pets, search]);
   const pendingRequests = requests.filter((request) => request.status === "pending" || request.status === "approved");
@@ -200,7 +210,7 @@ export default function AdminPage() {
   const select = (name: keyof PetFormData, label: string, options: string[]) => <select name={name} value={String(formData[name] ?? "")} onChange={handleChange} required className="field w-full"><option value="">{label}</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select>;
 
   return <main className="min-h-screen bg-cream p-3 pb-24 sm:p-5"><div className="mx-auto max-w-7xl">
-    <header className="border-b border-stone-200 pb-5"><div className="flex items-start justify-between gap-4"><div><p className="text-sm text-stone-500">Olá, {user.displayName}</p><h1 className="mt-1 font-sans text-3xl uppercase sm:text-5xl">Painel PetCare</h1></div><button type="button" onClick={() => setActiveTab("adoptions")} aria-label={`Notificações: ${pendingRequests.length} pendentes`} className="relative rounded-xl border border-stone-200 bg-white p-3 text-stone-600 shadow-sm transition hover:text-gold"><Bell size={22} />{pendingRequests.length > 0 && <span className="absolute -right-2 -top-2 grid min-h-6 min-w-6 place-items-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">{pendingRequests.length > 99 ? "99+" : pendingRequests.length}</span>}</button></div>
+    <header className="border-b border-stone-200 pb-5"><div className="flex items-start justify-between gap-4"><div><p className="text-sm text-stone-500">Olá, {user.displayName}</p><h1 className="mt-1 font-sans text-3xl uppercase sm:text-5xl">Painel PetCare</h1><Link href="/" className="mt-3 inline-flex text-sm text-gold hover:underline">← Voltar ao site</Link></div><NotificationBell /></div>
       <nav className="mt-6 flex flex-wrap gap-2" aria-label="Navegação do painel"><TabButton active={activeTab === "pets"} onClick={() => setActiveTab("pets")}><PawPrint size={17} />Gerenciar pets</TabButton><TabButton active={activeTab === "create"} onClick={() => { setEditingId(null); setActiveTab("create"); }}><Plus size={17} />Cadastrar pet</TabButton><TabButton active={activeTab === "adoptions"} onClick={() => setActiveTab("adoptions")}><Inbox size={17} />Solicitações de adoção{pendingRequests.length > 0 && <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs text-white">{pendingRequests.length}</span>}</TabButton></nav>
     </header>
     {message && <p role="status" className="mt-5 rounded-xl border border-gold/30 bg-gold/10 p-3 text-sm text-gold">{message}</p>}
