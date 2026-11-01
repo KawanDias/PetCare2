@@ -47,7 +47,13 @@ export async function POST(request: NextRequest) {
     }
     const pet = await databaseRequest<Record<string, unknown> | null>(`pets/${encodeURIComponent(payload.petId)}`);
     if (!pet) throw new ApiError(404, "Pet não encontrado.");
-    if (!process.env.RESEND_API_KEY) throw new ApiError(503, "O envio de e-mail não está configurado.");
+    // Configure these server-only variables in .env.local and in Vercel:
+    // RESEND_API_KEY is the Resend API key and RESEND_FROM_EMAIL must be a
+    // verified sender domain/address in Resend. Never expose either variable
+    // with a NEXT_PUBLIC_ prefix.
+    if (!process.env.RESEND_API_KEY || !process.env.RESEND_FROM_EMAIL) {
+      throw new ApiError(503, "O envio de e-mail não está configurado.");
+    }
     const item = {
       petId: payload.petId,
       petName: payload.petName,
@@ -71,7 +77,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        from: process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev",
+        from: process.env.RESEND_FROM_EMAIL,
         to: ["kawangoleiro79@gmail.com"],
         subject: `Nova solicitação de adoção: ${item.petName}`,
         text: [
