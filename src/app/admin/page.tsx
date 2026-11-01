@@ -2,7 +2,7 @@
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Edit3, Search, Trash2 } from "lucide-react";
+import { Bell, Check, Edit3, Inbox, MessageCircle, PawPrint, Plus, Search, Trash2 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/Button";
 import { Pet } from "@/lib/catalog-data";
@@ -40,6 +40,22 @@ type PetFormData = {
   emDestaque: boolean;
 };
 
+type AdoptionRequest = {
+  id: string;
+  petId: string;
+  petName: string;
+  imageUrl?: string;
+  fullName?: string;
+  cpf?: string;
+  phone?: string;
+  address?: string;
+  motivation?: string;
+  status: "pending" | "approved" | "completed" | "cancelled";
+  createdAt: string;
+};
+
+type AdminTab = "pets" | "create" | "adoptions";
+
 const emptyFormData: PetFormData = {
   name: "", species: "", breed: "", age: "", size: "", sex: "", coat: "",
   vaccinated: "", neutered: "", dewormed: "", temperament: "", description: "", emDestaque: false
@@ -73,25 +89,33 @@ function petToFormData(pet: Pet & Record<string, unknown>): PetFormData {
 export default function AdminPage() {
   const { user, role, loading } = useAuth();
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<AdminTab>("pets");
   const [pets, setPets] = useState<Pet[]>([]);
+  const [requests, setRequests] = useState<AdoptionRequest[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [message, setMessage] = useState("");
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
-  const editing = pets.find((pet) => pet.id === editingId);
   const [formData, setFormData] = useState<PetFormData>(emptyFormData);
+  const editing = pets.find((pet) => pet.id === editingId);
 
   useEffect(() => {
     setFormData(editing ? petToFormData(editing as Pet & Record<string, unknown>) : emptyFormData);
-  }, [editingId, pets]);
+  }, [editing, editingId]);
 
   useEffect(() => {
     if (!loading && (!user || role !== "admin")) router.replace("/");
   }, [loading, role, router, user]);
 
-  useEffect(() => { void apiFetch<Pet[]>("/api/pets").then(setPets).catch((error) => { console.error("Erro ao carregar pets pela API.", error); setMessage("Não foi possível carregar os pets."); }); }, []);
+  useEffect(() => {
+    if (!user || role !== "admin") return;
+    void Promise.all([apiFetch<Pet[]>("/api/pets"), apiFetch<AdoptionRequest[]>("/api/adoptions")])
+      .then(([loadedPets, loadedRequests]) => { setPets(loadedPets); setRequests(loadedRequests); })
+      .catch((error) => { console.error("Erro ao carregar dados administrativos.", error); setMessage("Não foi possível carregar os dados do painel."); });
+  }, [role, user]);
 
   const filteredPets = useMemo(() => pets.filter((pet) => pet.name.toLowerCase().includes(search.toLowerCase())), [pets, search]);
+  const pendingRequests = requests.filter((request) => request.status === "pending" || request.status === "approved");
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -115,8 +139,7 @@ export default function AdminPage() {
       const images = selectedImages.length ? await Promise.all(selectedImages.map(fileToBase64)) : existingImages;
       if (!images.length) { setMessage("Adicione pelo menos 1 foto do pet."); return; }
       const pet: Pet = {
-        id: editingId ?? "",
-        name: String(data.get("name") ?? "").trim(),
+        id: editingId ?? "", name: String(data.get("name") ?? "").trim(),
         species: String(data.get("species") ?? ""), breed: String(data.get("breed") ?? "").trim(),
         age: String(data.get("age") ?? "").trim(), size: String(data.get("size") ?? ""),
         sex: String(data.get("sex") ?? ""), coat: String(data.get("coat") ?? "").trim(),
@@ -129,7 +152,12 @@ export default function AdminPage() {
         ? await apiFetch<Pet>(`/api/pets/${encodeURIComponent(editingId)}`, { method: "PUT", body: JSON.stringify(pet) })
         : await apiFetch<Pet>("/api/pets", { method: "POST", body: JSON.stringify(pet) });
       setPets((items) => editingId ? items.map((item) => item.id === saved.id ? saved : item) : [...items, saved]);
-      setEditingId(null); setSelectedImages([]); form.reset(); setFormData(emptyFormData); setMessage(`${pet.name} salvo com sucesso.`);
+      setEditingId(null);
+      setSelectedImages([]);
+      form.reset();
+      setFormData(emptyFormData);
+      setActiveTab("pets");
+      setMessage(`${pet.name} salvo com sucesso.`);
     } catch (error) {
       console.error("Erro ao gravar pet.", error);
       setMessage(error instanceof Error ? error.message : "Não foi possível salvar o pet.");
@@ -138,8 +166,14 @@ export default function AdminPage() {
 
   async function removePet(pet: Pet) {
     if (!window.confirm(`Excluir "${pet.name}"? Essa ação não pode ser desfeita.`)) return;
-    try { await apiFetch(`/api/pets/${encodeURIComponent(pet.id)}`, { method: "DELETE" }); setPets((items) => items.filter((item) => item.id !== pet.id)); setMessage(`${pet.name} removido.`); }
-    catch (error) { console.error("Erro ao excluir pet.", error); setMessage("Não foi possível excluir o pet."); }
+    try {
+      await apiFetch(`/api/pets/${encodeURIComponent(pet.id)}`, { method: "DELETE" });
+      setPets((items) => items.filter((item) => item.id !== pet.id));
+      setMessage(`${pet.name} removido.`);
+    } catch (error) {
+      console.error("Erro ao excluir pet.", error);
+      setMessage("Não foi possível excluir o pet.");
+    }
   }
 
   async function markAsAdopted(pet: Pet) {
@@ -147,6 +181,7 @@ export default function AdminPage() {
     try {
       const saved = await apiFetch<Pet>(`/api/pets/${encodeURIComponent(pet.id)}`, { method: "PUT", body: JSON.stringify({ ...pet, status: "adotado" }) });
       setPets((items) => items.map((item) => item.id === saved.id ? saved : item));
+      setRequests((items) => items.map((request) => request.petId === pet.id ? { ...request, status: "completed" } : request));
       setMessage(`${pet.name} foi marcado como adotado.`);
     } catch (error) {
       console.error("Erro ao marcar pet como adotado.", error);
@@ -162,11 +197,23 @@ export default function AdminPage() {
     setFormData((current) => ({ ...current, [name]: value }));
   };
   const field = (name: keyof PetFormData, placeholder: string) => <input name={name} value={String(formData[name] ?? "")} onChange={handleChange} required className="field w-full" placeholder={placeholder} />;
-  const select = (name: keyof PetFormData, label: string, options: string[]) => <select name={name} value={String(formData[name] ?? "")} onChange={handleChange} required className="field w-full"><option value=""> {label} </option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select>;
-  return <main className="min-h-screen overflow-x-hidden bg-cream p-3 pb-24 sm:p-5"><div className="mx-auto max-w-7xl"><div className="flex items-end justify-between gap-4"><div><h1 className="font-sans text-3xl uppercase sm:text-5xl">Painel PetCare</h1></div><a href="/" className="text-sm text-gold">← Voltar ao site</a></div>
+  const select = (name: keyof PetFormData, label: string, options: string[]) => <select name={name} value={String(formData[name] ?? "")} onChange={handleChange} required className="field w-full"><option value="">{label}</option>{options.map((option) => <option key={option} value={option}>{option}</option>)}</select>;
+
+  return <main className="min-h-screen bg-cream p-3 pb-24 sm:p-5"><div className="mx-auto max-w-7xl">
+    <header className="border-b border-stone-200 pb-5"><div className="flex items-start justify-between gap-4"><div><p className="text-sm text-stone-500">Olá, {user.displayName}</p><h1 className="mt-1 font-sans text-3xl uppercase sm:text-5xl">Painel PetCare</h1></div><button type="button" onClick={() => setActiveTab("adoptions")} aria-label={`Notificações: ${pendingRequests.length} pendentes`} className="relative rounded-xl border border-stone-200 bg-white p-3 text-stone-600 shadow-sm transition hover:text-gold"><Bell size={22} />{pendingRequests.length > 0 && <span className="absolute -right-2 -top-2 grid min-h-6 min-w-6 place-items-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">{pendingRequests.length > 99 ? "99+" : pendingRequests.length}</span>}</button></div>
+      <nav className="mt-6 flex flex-wrap gap-2" aria-label="Navegação do painel"><TabButton active={activeTab === "pets"} onClick={() => setActiveTab("pets")}><PawPrint size={17} />Gerenciar pets</TabButton><TabButton active={activeTab === "create"} onClick={() => { setEditingId(null); setActiveTab("create"); }}><Plus size={17} />Cadastrar pet</TabButton><TabButton active={activeTab === "adoptions"} onClick={() => setActiveTab("adoptions")}><Inbox size={17} />Solicitações de adoção{pendingRequests.length > 0 && <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs text-white">{pendingRequests.length}</span>}</TabButton></nav>
+    </header>
     {message && <p role="status" className="mt-5 rounded-xl border border-gold/30 bg-gold/10 p-3 text-sm text-gold">{message}</p>}
-    <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(280px,420px)_1fr]">
-      <form key={editingId ?? "new"} onSubmit={save} className="grid content-start gap-3 rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-5"><h2 className="font-sans text-2xl uppercase">{editing ? "Atualizar pet" : "Cadastrar pet"}</h2>{field("name", "Nome do pet")}{select("species", "Espécie", choices.species)}{field("breed", "Raça (ex.: SRD / Vira-lata)")}{field("age", "Idade (ex.: 2 anos)")}{select("size", "Porte", choices.size)}{select("sex", "Sexo", choices.sex)}{field("coat", "Cor / Pelagem")}<div className="grid gap-3 sm:grid-cols-3">{select("vaccinated", "Vacinado?", choices.yesNo)}{select("neutered", "Castrado?", choices.yesNo)}{select("dewormed", "Vermifugado?", choices.yesNo)}</div>{field("temperament", "Personalidade / Temperamento")}<textarea name="description" value={formData.description} onChange={handleChange} placeholder="História / descrição detalhada" className="field min-h-28 w-full" required /><input name="images" type="file" accept="image/*" multiple onChange={handleImageChange} className="field w-full text-sm" />{selectedImages.length > 0 && <p className="text-xs text-gold">{selectedImages.length} imagem(ns) pronta(s) para envio.</p>}<p className="text-xs text-stone-500">Selecione de 1 a 5 fotos. As imagens são armazenadas em Base64.</p><label className="flex min-h-11 items-center gap-2 text-sm text-stone-600"><input name="emDestaque" type="checkbox" checked={formData.emDestaque} onChange={(event) => setFormData((current) => ({ ...current, emDestaque: event.target.checked }))} /> Em destaque na Home</label><Button className="min-h-11 w-full">{editing ? "Atualizar pet" : "Cadastrar pet"}</Button>{editing && <button type="button" onClick={() => setEditingId(null)} className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm text-stone-600">Cancelar edição</button>}</form>
-      <section className="rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-sans text-2xl uppercase">Pets cadastrados</h2><p className="text-sm text-stone-500">{filteredPets.length} resultado(s)</p></div><div className="relative sm:max-w-xs"><Search size={17} className="absolute left-3 top-3 text-stone-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar por nome" className="field pl-10" /></div></div><div className="mt-5 grid gap-3">{filteredPets.map((pet) => <div key={pet.id} role="link" tabIndex={0} onClick={() => router.push(`/pets/${encodeURIComponent(pet.id)}`)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); router.push(`/pets/${encodeURIComponent(pet.id)}`); } }} className="flex cursor-pointer items-center gap-3 rounded-2xl border border-stone-200 p-3"><img src={pet.imageUrls[0]} alt={`Foto de ${pet.name}`} className="h-14 w-14 rounded-xl object-cover" /><div className="min-w-0 flex-1"><p className="truncate font-semibold">{pet.name}</p><p className="text-sm text-stone-500">{pet.species} · {pet.breed} · {pet.age}</p>{pet.emDestaque && <span className="inline-flex items-center gap-1 text-xs text-gold"><Check size={12} /> Em destaque</span>}</div>{pet.status !== "adotado" && <button title="Marcar como adotado" aria-label="Marcar como adotado" onClick={(event) => { event.stopPropagation(); void markAsAdopted(pet); }} className="min-h-11 rounded-xl border border-green-300 px-3 text-xs text-green-700 hover:bg-green-50">Marcar como adotado</button>}<button title="Editar" aria-label="Editar" onClick={(event) => { event.stopPropagation(); setEditingId(pet.id); }} className="min-h-11 min-w-11 text-stone-500 hover:text-gold"><Edit3 size={17} /></button><button title="Excluir" aria-label="Excluir" onClick={(event) => { event.stopPropagation(); void removePet(pet); }} className="min-h-11 min-w-11 text-stone-500 hover:text-red-400"><Trash2 size={17} /></button></div>)}{filteredPets.length === 0 && <p className="text-sm text-stone-600">Nenhum pet cadastrado.</p>}</div></section>
-    </div></div></main>;
+    {activeTab === "pets" && <section className="mt-6 rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-6"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-sans text-2xl uppercase">Pets cadastrados</h2><p className="text-sm text-stone-500">{filteredPets.length} resultado(s)</p></div><div className="relative sm:max-w-xs"><Search size={17} className="absolute left-3 top-3 text-stone-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar por nome" className="field pl-10" /></div></div><div className="mt-5 grid gap-3">{filteredPets.map((pet) => <div key={pet.id} role="link" tabIndex={0} onClick={() => router.push(`/pets/${encodeURIComponent(pet.id)}`)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); router.push(`/pets/${encodeURIComponent(pet.id)}`); } }} className="flex cursor-pointer flex-wrap items-center gap-3 rounded-2xl border border-stone-200 bg-white p-3"><img src={pet.imageUrls[0]} alt={`Foto de ${pet.name}`} className="h-14 w-14 rounded-xl object-cover" /><div className="min-w-0 flex-1"><p className="truncate font-semibold">{pet.name}</p><p className="text-sm text-stone-500">{pet.species} · {pet.breed} · {pet.age}</p>{pet.status === "adotado" && <span className="text-xs font-semibold text-green-700">Adotado</span>}{pet.status !== "adotado" && pet.emDestaque && <span className="inline-flex items-center gap-1 text-xs text-gold"><Check size={12} /> Em destaque</span>}</div>{pet.status !== "adotado" && <button title="Marcar como adotado" onClick={(event) => { event.stopPropagation(); void markAsAdopted(pet); }} className="min-h-11 rounded-xl border border-green-300 px-3 text-xs text-green-700 hover:bg-green-50">Marcar como adotado</button>}<button title="Editar" onClick={(event) => { event.stopPropagation(); setEditingId(pet.id); setActiveTab("create"); }} className="min-h-11 min-w-11 text-stone-500 hover:text-gold"><Edit3 size={17} /></button><button title="Excluir" onClick={(event) => { event.stopPropagation(); void removePet(pet); }} className="min-h-11 min-w-11 text-stone-500 hover:text-red-400"><Trash2 size={17} /></button></div>)}{filteredPets.length === 0 && <p className="text-sm text-stone-600">Nenhum pet cadastrado.</p>}</div></section>}
+    {activeTab === "create" && <form key={editingId ?? "new"} onSubmit={save} className="mx-auto mt-6 grid max-w-3xl gap-3 rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-6"><h2 className="font-sans text-2xl uppercase">{editing ? "Atualizar pet" : "Cadastrar pet"}</h2>{field("name", "Nome do pet")}{select("species", "Espécie", choices.species)}{field("breed", "Raça (ex.: SRD / Vira-lata)")}{field("age", "Idade (ex.: 2 anos)")}{select("size", "Porte", choices.size)}{select("sex", "Sexo", choices.sex)}{field("coat", "Cor / Pelagem")}<div className="grid gap-3 sm:grid-cols-3">{select("vaccinated", "Vacinado?", choices.yesNo)}{select("neutered", "Castrado?", choices.yesNo)}{select("dewormed", "Vermifugado?", choices.yesNo)}</div>{field("temperament", "Personalidade / Temperamento")}<textarea name="description" value={formData.description} onChange={handleChange} placeholder="História / descrição detalhada" className="field min-h-28 w-full" required /><input name="images" type="file" accept="image/*" multiple onChange={handleImageChange} className="field w-full text-sm" />{selectedImages.length > 0 && <p className="text-xs text-gold">{selectedImages.length} imagem(ns) pronta(s) para envio.</p>}<p className="text-xs text-stone-500">Selecione de 1 a 5 fotos. As imagens são armazenadas em Base64.</p><label className="flex min-h-11 items-center gap-2 text-sm text-stone-600"><input name="emDestaque" type="checkbox" checked={formData.emDestaque} onChange={(event) => setFormData((current) => ({ ...current, emDestaque: event.target.checked }))} /> Em destaque na Home</label><Button className="min-h-11 w-full">{editing ? "Atualizar pet" : "Cadastrar pet"}</Button>{editing && <button type="button" onClick={() => setEditingId(null)} className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm text-stone-600">Cancelar edição</button>}</form>}
+    {activeTab === "adoptions" && <AdoptionsPanel requests={requests} pendingRequests={pendingRequests} onMarkAdopted={(petId) => { const pet = pets.find((item) => item.id === petId); if (pet) void markAsAdopted(pet); }} />}
+  </div></main>;
+}
+
+function TabButton({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
+  return <button type="button" onClick={onClick} className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${active ? "bg-gold text-stone-900 shadow-sm" : "border border-stone-200 bg-white text-stone-600 hover:border-gold/50 hover:text-gold"}`}>{children}</button>;
+}
+
+function AdoptionsPanel({ requests, pendingRequests, onMarkAdopted }: { requests: AdoptionRequest[]; pendingRequests: AdoptionRequest[]; onMarkAdopted: (petId: string) => void }) {
+  return <section className="mx-auto mt-6 max-w-5xl rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-6"><div className="flex items-end justify-between gap-3"><div><h2 className="font-sans text-2xl uppercase">Solicitações de adoção</h2><p className="text-sm text-stone-500">{pendingRequests.length} pendente(s)</p></div></div><div className="mt-5 grid gap-4">{requests.map((request) => <article key={request.id} className="rounded-2xl border border-stone-200 bg-white p-4"><div className="flex flex-wrap items-start gap-4"><img src={request.imageUrl || "/samples/placeholder.svg"} alt="" className="h-16 w-16 rounded-xl object-cover" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold">{request.petName}</h3><span className={`rounded-full px-2 py-1 text-xs ${request.status === "completed" ? "bg-green-100 text-green-700" : "bg-gold/15 text-gold"}`}>{request.status === "completed" ? "Concluída" : "Pendente"}</span></div><p className="mt-1 text-sm text-stone-600">{request.fullName || "Adotante não informado"} · {request.phone || "Telefone não informado"}</p><p className="mt-1 text-xs text-stone-500">{request.address || "Endereço não informado"}</p><p className="mt-3 text-sm text-stone-600">{request.motivation || "Sem justificativa informada."}</p></div></div><div className="mt-4 flex flex-wrap gap-2">{request.phone && <a href={`https://wa.me/${request.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white"><MessageCircle size={16} /> WhatsApp</a>}{request.status !== "completed" && <button type="button" onClick={() => onMarkAdopted(request.petId)} className="inline-flex items-center gap-2 rounded-xl border border-green-300 px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-50">Marcar como adotado</button>}</div></article>)}{requests.length === 0 && <div className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-stone-500"><Inbox className="mx-auto mb-2" />Nenhuma solicitação registrada.</div>}</div></section>;
 }

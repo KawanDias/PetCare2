@@ -24,6 +24,11 @@ export async function GET(request: NextRequest) {
   try {
     const identity = await authenticate(request);
     if (!identity) throw new ApiError(401, "Autenticação necessária.");
+    if (identity.isAdmin) {
+      const users = await databaseRequest<Record<string, { adoptionRequests?: Record<string, Omit<AdoptionRequest, "id">> }>>("users", {}, tokenFromRequest(request));
+      const requests = Object.entries(users ?? {}).flatMap(([userId, user]) => Object.entries(user.adoptionRequests ?? {}).map(([id, item]) => ({ id, ...item, userId })));
+      return Response.json(requests.sort((a, b) => b.createdAt.localeCompare(a.createdAt)), { status: 200 });
+    }
     const value = await databaseRequest<Record<string, Omit<AdoptionRequest, "id">> | null>(`users/${identity.uid}/adoptionRequests`, {}, tokenFromRequest(request));
     return Response.json(Object.entries(value ?? {}).map(([id, item]) => ({ id, ...item })).sort((a, b) => b.createdAt.localeCompare(a.createdAt)), { status: 200 });
   } catch (error) {
