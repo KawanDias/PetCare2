@@ -16,7 +16,7 @@ export async function GET() {
     if (value !== null && (typeof value !== "object" || Array.isArray(value))) {
       throw new ApiError(502, "Resposta inválida do Realtime Database.");
     }
-    return Response.json(Object.entries(value ?? {}).map(([id, pet]) => ({ id, ...pet })), { status: 200 });
+    return Response.json(Object.entries(value ?? {}).map(([id, pet]) => ({ id, ...pet, status: pet.status ?? "disponivel" })), { status: 200 });
   } catch (error) {
     return jsonError(error);
   }
@@ -25,7 +25,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     await requireAdmin(request);
-    const pet = await request.json() as Partial<Pet>;
+    const pet = { ...await request.json() as Partial<Pet>, status: "disponivel" as const };
     validatePet(pet);
     const token = tokenFromRequest(request);
     const created = await databaseRequest<Pet>("pets", { method: "POST", body: JSON.stringify(pet) }, token);

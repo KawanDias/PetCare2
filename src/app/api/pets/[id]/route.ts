@@ -7,7 +7,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     const { id } = await context.params;
     const pet = await databaseRequest<Omit<Pet, "id"> | null>(`pets/${encodeURIComponent(id)}`);
     if (!pet) throw new ApiError(404, "Pet não encontrado.");
-    return Response.json({ id, ...pet }, { status: 200 });
+    return Response.json({ id, ...pet, status: pet.status ?? "disponivel" }, { status: 200 });
   } catch (error) {
     return jsonError(error);
   }
@@ -30,8 +30,15 @@ export async function PUT(request: NextRequest, context: { params: Promise<{ id:
     const token = tokenFromRequest(request);
     const current = await databaseRequest<Omit<Pet, "id"> | null>(`pets/${encodeURIComponent(id)}`, {}, token);
     if (!current) throw new ApiError(404, "Pet não encontrado.");
-    await databaseRequest(`pets/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(pet) }, token);
-    return Response.json({ id, ...pet }, { status: 200 });
+    const nextPet = { ...pet, status: pet.status === "adotado" ? "adotado" : "disponivel" };
+    await databaseRequest(`pets/${encodeURIComponent(id)}`, { method: "PUT", body: JSON.stringify(nextPet) }, token);
+    if (nextPet.status === "adotado") {
+      const users = await databaseRequest<Record<string, { adoptionRequests?: Record<string, Record<string, unknown>> }>>("users", {}, token);
+      await Promise.all(Object.entries(users ?? {}).flatMap(([uid, userData]) => Object.entries(userData.adoptionRequests ?? {}).filter(([, request]) => request.petId === id).map(([requestId, request]) =>
+        databaseRequest(`users/${encodeURIComponent(uid)}/adoptionRequests/${encodeURIComponent(requestId)}`, { method: "PUT", body: JSON.stringify({ ...request, status: "completed" }) }, token)
+      )));
+    }
+    return Response.json({ id, ...nextPet }, { status: 200 });
   } catch (error) {
     return jsonError(error);
   }

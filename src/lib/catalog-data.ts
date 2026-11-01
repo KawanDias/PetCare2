@@ -31,6 +31,7 @@ export type Pet = {
   images?: string[];
   image?: string;
   emDestaque: boolean;
+  status?: "disponivel" | "adotado" | string;
 };
 
 export type PortfolioItem = {
