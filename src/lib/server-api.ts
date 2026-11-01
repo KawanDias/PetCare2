@@ -55,7 +55,17 @@ export async function databaseRequest<T>(path: string, init: RequestInit = {}, t
   headers.set("Content-Type", "application/json");
   const url = new URL(`${getDatabaseUrl()}/${path}.json`);
   if (token) url.searchParams.set("access_token", token);
-  const response = await fetch(url, { ...init, headers, cache: "no-store" });
+  let response: Response;
+  try {
+    response = await fetch(url, { ...init, headers, cache: "no-store" });
+  } catch (error) {
+    console.error("Falha de rede ao acessar o Firebase Realtime Database.", {
+      path,
+      url: url.toString(),
+      error
+    });
+    throw new ApiError(502, "Não foi possível conectar ao Realtime Database.");
+  }
   const body = await response.json().catch(() => null) as T | { error?: string } | null;
   if (!response.ok) {
     const firebaseError = body && typeof body === "object" && "error" in body ? body.error : undefined;
