@@ -53,7 +53,8 @@ export async function requireAdmin(request: NextRequest) {
 export async function databaseRequest<T>(path: string, init: RequestInit = {}, token?: string) {
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json");
-  const url = new URL(`${getDatabaseUrl()}/${path}.json`);
+  const url = new URL(getDatabaseUrl());
+  url.pathname = `${url.pathname.replace(/\/$/, "")}/${path}.json`;
   if (token) url.searchParams.set("access_token", token);
   let response: Response;
   try {

@@ -13,6 +13,9 @@ function validatePet(value: Partial<Pet>) {
 export async function GET() {
   try {
     const value = await databaseRequest<Record<string, Omit<Pet, "id">> | null>("pets");
+    if (value !== null && (typeof value !== "object" || Array.isArray(value))) {
+      throw new ApiError(502, "Resposta inválida do Realtime Database.");
+    }
     return Response.json(Object.entries(value ?? {}).map(([id, pet]) => ({ id, ...pet })), { status: 200 });
   } catch (error) {
     return jsonError(error);
