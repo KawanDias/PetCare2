@@ -5,7 +5,7 @@
     "pets": {
       ".read": true,
       "$petId": {
-        ".write": "auth != null"
+        ".write": "auth != null && auth.token.email == 'kawangoleiro79@gmail.com'"
       }
     },
     "products": {
