@@ -5,6 +5,7 @@
     "pets": {
       ".read": true,
       "$petId": {
+        ".read": true,
         ".write": "auth != null && auth.token.email == 'kawangoleiro79@gmail.com'"
       }
     },
@@ -48,7 +49,6 @@
     "usuarios": {
       "$userId": {
         ".read": "auth != null && auth.uid == $userId",
-        ".write": "auth != null && auth.uid == $userId",
         "favoritos": {
           ".read": "auth != null && auth.uid == $userId",
           ".write": "auth != null && auth.uid == $userId"
@@ -60,7 +60,6 @@
       }
     },
     "solicitacoes": {
-      ".read": "auth != null && auth.token.email == 'kawangoleiro79@gmail.com'",
       "$requestId": {
         ".read": "auth != null && (data.child('userId').val() == auth.uid || data.child('uid').val() == auth.uid || auth.token.email == 'kawangoleiro79@gmail.com')",
         ".write": "auth != null && (auth.token.email == 'kawangoleiro79@gmail.com' || ((!data.exists() && (newData.child('userId').val() == auth.uid || newData.child('uid').val() == auth.uid)) || (data.child('userId').val() == auth.uid || data.child('uid').val() == auth.uid)))",
