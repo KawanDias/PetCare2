@@ -48,23 +48,24 @@ const emptyFormData: PetFormData = {
 function normalizeOption(value: unknown, options: string[], aliases: Record<string, string> = {}) {
   const normalized = String(value ?? "").trim().toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const option = aliases[normalized] ?? normalized;
-  return options.find((item) => item.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\u0300-\u036f]/g, "") === option) ?? "";
+  return options.find((item) => item.toLocaleLowerCase("pt-BR").normalize("NFD").replace(/[\u0300-\u036f]/g, "") === option) ?? String(value ?? "").trim();
 }
 
-function petToFormData(pet: Pet): PetFormData {
+function petToFormData(pet: Pet & Record<string, unknown>): PetFormData {
+  const field = (...names: string[]) => names.map((name) => pet[name]).find((value) => value !== undefined && value !== null) ?? "";
   return {
-    name: pet.name ?? "",
-    species: normalizeOption(pet.species, choices.species, { cao: "cachorro", cachorro: "cachorro" }),
-    breed: pet.breed ?? "",
-    age: pet.age ?? "",
-    size: normalizeOption(pet.size, choices.size),
-    sex: normalizeOption(pet.sex, choices.sex),
-    coat: pet.coat ?? "",
-    vaccinated: normalizeOption(pet.vaccinated, choices.yesNo),
-    neutered: normalizeOption(pet.neutered, choices.yesNo),
-    dewormed: normalizeOption(pet.dewormed, choices.yesNo),
-    temperament: pet.temperament ?? "",
-    description: pet.description ?? "",
+    name: String(field("name")),
+    species: normalizeOption(field("species", "especie"), choices.species, { cao: "cachorro", cachorro: "cachorro" }),
+    breed: String(field("breed", "raca")),
+    age: String(field("age", "idade")),
+    size: normalizeOption(field("size", "porte"), choices.size),
+    sex: normalizeOption(field("sex", "sexo"), choices.sex),
+    coat: String(field("coat", "pelagem", "cor")),
+    vaccinated: normalizeOption(field("vaccinated", "vacinado"), choices.yesNo),
+    neutered: normalizeOption(field("neutered", "castrado"), choices.yesNo),
+    dewormed: normalizeOption(field("dewormed", "vermifugado"), choices.yesNo),
+    temperament: String(field("temperament", "personalidade")),
+    description: String(field("description", "historia")),
     emDestaque: Boolean(pet.emDestaque)
   };
 }
@@ -81,8 +82,8 @@ export default function AdminPage() {
   const [formData, setFormData] = useState<PetFormData>(emptyFormData);
 
   useEffect(() => {
-    setFormData(editing ? petToFormData(editing) : emptyFormData);
-  }, [editing]);
+    setFormData(editing ? petToFormData(editing as Pet & Record<string, unknown>) : emptyFormData);
+  }, [editingId, pets]);
 
   useEffect(() => {
     if (!loading && (!user || role !== "admin")) router.replace("/");
@@ -153,7 +154,7 @@ export default function AdminPage() {
   return <main className="min-h-screen overflow-x-hidden bg-cream p-3 pb-24 sm:p-5"><div className="mx-auto max-w-7xl"><div className="flex items-end justify-between gap-4"><div><h1 className="font-sans text-3xl uppercase sm:text-5xl">Painel PetCare</h1></div><a href="/" className="text-sm text-gold">← Voltar ao site</a></div>
     {message && <p role="status" className="mt-5 rounded-xl border border-gold/30 bg-gold/10 p-3 text-sm text-gold">{message}</p>}
     <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(280px,420px)_1fr]">
-      <form onSubmit={save} className="grid content-start gap-3 rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-5"><h2 className="font-sans text-2xl uppercase">{editing ? "Atualizar pet" : "Cadastrar pet"}</h2>{field("name", "Nome do pet")}{select("species", "Espécie", choices.species)}{field("breed", "Raça (ex.: SRD / Vira-lata)")}{field("age", "Idade (ex.: 2 anos)")}{select("size", "Porte", choices.size)}{select("sex", "Sexo", choices.sex)}{field("coat", "Cor / Pelagem")}<div className="grid gap-3 sm:grid-cols-3">{select("vaccinated", "Vacinado?", choices.yesNo)}{select("neutered", "Castrado?", choices.yesNo)}{select("dewormed", "Vermifugado?", choices.yesNo)}</div>{field("temperament", "Personalidade / Temperamento")}<textarea name="description" value={formData.description} onChange={handleChange} placeholder="História / descrição detalhada" className="field min-h-28 w-full" required /><input name="images" type="file" accept="image/*" multiple onChange={handleImageChange} className="field w-full text-sm" />{selectedImages.length > 0 && <p className="text-xs text-gold">{selectedImages.length} imagem(ns) pronta(s) para envio.</p>}<p className="text-xs text-stone-500">Selecione de 1 a 5 fotos. As imagens são armazenadas em Base64.</p><label className="flex min-h-11 items-center gap-2 text-sm text-stone-600"><input name="emDestaque" type="checkbox" checked={formData.emDestaque} onChange={(event) => setFormData((current) => ({ ...current, emDestaque: event.target.checked }))} /> Em destaque na Home</label><Button className="min-h-11 w-full">{editing ? "Atualizar pet" : "Cadastrar pet"}</Button>{editing && <button type="button" onClick={() => setEditingId(null)} className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm text-stone-600">Cancelar edição</button>}</form>
+      <form key={editingId ?? "new"} onSubmit={save} className="grid content-start gap-3 rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-5"><h2 className="font-sans text-2xl uppercase">{editing ? "Atualizar pet" : "Cadastrar pet"}</h2>{field("name", "Nome do pet")}{select("species", "Espécie", choices.species)}{field("breed", "Raça (ex.: SRD / Vira-lata)")}{field("age", "Idade (ex.: 2 anos)")}{select("size", "Porte", choices.size)}{select("sex", "Sexo", choices.sex)}{field("coat", "Cor / Pelagem")}<div className="grid gap-3 sm:grid-cols-3">{select("vaccinated", "Vacinado?", choices.yesNo)}{select("neutered", "Castrado?", choices.yesNo)}{select("dewormed", "Vermifugado?", choices.yesNo)}</div>{field("temperament", "Personalidade / Temperamento")}<textarea name="description" value={formData.description} onChange={handleChange} placeholder="História / descrição detalhada" className="field min-h-28 w-full" required /><input name="images" type="file" accept="image/*" multiple onChange={handleImageChange} className="field w-full text-sm" />{selectedImages.length > 0 && <p className="text-xs text-gold">{selectedImages.length} imagem(ns) pronta(s) para envio.</p>}<p className="text-xs text-stone-500">Selecione de 1 a 5 fotos. As imagens são armazenadas em Base64.</p><label className="flex min-h-11 items-center gap-2 text-sm text-stone-600"><input name="emDestaque" type="checkbox" checked={formData.emDestaque} onChange={(event) => setFormData((current) => ({ ...current, emDestaque: event.target.checked }))} /> Em destaque na Home</label><Button className="min-h-11 w-full">{editing ? "Atualizar pet" : "Cadastrar pet"}</Button>{editing && <button type="button" onClick={() => setEditingId(null)} className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm text-stone-600">Cancelar edição</button>}</form>
       <section className="rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-5"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-sans text-2xl uppercase">Pets cadastrados</h2><p className="text-sm text-stone-500">{filteredPets.length} resultado(s)</p></div><div className="relative sm:max-w-xs"><Search size={17} className="absolute left-3 top-3 text-stone-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar por nome" className="field pl-10" /></div></div><div className="mt-5 grid gap-3">{filteredPets.map((pet) => <div key={pet.id} className="flex items-center gap-3 rounded-2xl border border-stone-200 p-3"><img src={pet.imageUrls[0]} alt="" className="h-14 w-14 rounded-xl object-cover" /><div className="min-w-0 flex-1"><p className="truncate font-semibold">{pet.name}</p><p className="text-sm text-stone-500">{pet.species} · {pet.breed} · {pet.age}</p>{pet.emDestaque && <span className="inline-flex items-center gap-1 text-xs text-gold"><Check size={12} /> Em destaque</span>}</div><button title="Editar" aria-label="Editar" onClick={() => setEditingId(pet.id)} className="min-h-11 min-w-11 text-stone-500 hover:text-gold"><Edit3 size={17} /></button><button title="Excluir" aria-label="Excluir" onClick={() => void removePet(pet)} className="min-h-11 min-w-11 text-stone-500 hover:text-red-400"><Trash2 size={17} /></button></div>)}{filteredPets.length === 0 && <p className="text-sm text-stone-600">Nenhum pet cadastrado.</p>}</div></section>
     </div></div></main>;
 }
