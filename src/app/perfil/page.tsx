@@ -52,5 +52,25 @@ export default function ProfilePage() {
 
 function Title({ text }: { text: string }) { return <div className="sm:col-span-2"><h2 className="text-2xl font-bold">{text}</h2><div className="mt-2 h-px bg-stone-100" /></div>; }
 function AddressPanel({ address, setAddress, onSave }: { address: UserAddress; setAddress: (value: UserAddress) => void; onSave: (event: FormEvent) => void }) { return <form onSubmit={onSave} className="grid gap-4 sm:grid-cols-2"><Title text="Endereço para adoção responsável" />{(["cep", "street", "number", "neighborhood", "city", "reference"] as const).map((field) => <label key={field}>{({ cep: "CEP", street: "Rua", number: "Número", neighborhood: "Bairro", city: "Cidade", reference: "Ponto de referência" }[field])}<input className="field mt-2" value={address[field]} onChange={(e) => setAddress({ ...address, [field]: e.target.value })} /></label>)}<button className="rounded-xl bg-gold px-5 py-3 font-bold text-white sm:col-span-2">Salvar endereço</button></form>; }
-function FavoritesPanel({ user }: { user: NonNullable<ReturnType<typeof useAuth>["user"]> }) { return <div><Title text="Pets Favoritos" />{user.favorites.length === 0 ? <p className="mt-5 text-stone-500">Você ainda não salvou nenhum pet.</p> : <div className="mt-5 grid gap-3">{user.favorites.map((item) => <Link key={`${item.type}-${item.id}`} href={item.type === "pet" ? `/pets/${item.id}` : "#"} className="flex items-center gap-3 rounded-xl border border-stone-200 p-3"><img src={item.imageUrl} alt="" className="h-14 w-14 rounded-lg object-cover" /><span className="font-semibold">{item.name}</span><ChevronRight className="ml-auto text-stone-400" size={17} /></Link>)}</div>}</div>; }
+function FavoritesPanel({ user }: { user: NonNullable<ReturnType<typeof useAuth>["user"]> }) {
+  const { toggleFavorite } = useAuth();
+  const [favorites, setFavorites] = useState(user.favorites);
+
+  useEffect(() => setFavorites(user.favorites), [user.favorites]);
+
+  async function removeFavorite(item: typeof favorites[number], event: React.MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    const previous = favorites;
+    setFavorites((items) => items.filter((favorite) => !(favorite.id === item.id && favorite.type === item.type)));
+    try {
+      await toggleFavorite(item);
+    } catch (error) {
+      console.error("Não foi possível remover o pet dos favoritos.", error);
+      setFavorites(previous);
+    }
+  }
+
+  return <div><Title text="Pets Favoritos" />{favorites.length === 0 ? <p className="mt-5 text-stone-500">Você ainda não salvou nenhum pet.</p> : <div className="mt-5 grid gap-3">{favorites.map((item) => item.type === "pet" ? <div key={`${item.type}-${item.id}`} className="relative"><Link href={`/pets/${encodeURIComponent(item.id)}`} className="flex items-center gap-3 rounded-xl border border-stone-200 p-3 pr-14 hover:border-gold/50"><img src={item.imageUrl} alt={`Foto de ${item.name}`} className="h-14 w-14 rounded-lg object-cover" /><span className="font-semibold">{item.name}</span><ChevronRight className="ml-auto text-stone-400" size={17} /></Link><button type="button" onClick={(event) => void removeFavorite(item, event)} aria-label={`Remover ${item.name} dos favoritos`} className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full p-2 text-red-500 transition hover:bg-red-50" title="Remover dos favoritos">❤️</button></div> : <div key={`${item.type}-${item.id}`} className="flex items-center gap-3 rounded-xl border border-stone-200 p-3"><img src={item.imageUrl} alt={`Imagem de ${item.name}`} className="h-14 w-14 rounded-lg object-cover" /><span className="font-semibold">{item.name}</span></div>)}</div>}</div>;
+}
 function RequestsPanel({ title, requests, empty }: { title: string; requests: AdoptionRequest[]; empty: string }) { return <div><Title text={title} />{requests.length === 0 ? <p className="mt-5 text-stone-500">{empty}</p> : <div className="mt-5 space-y-3">{requests.map((request) => <article key={request.id} className="flex gap-4 rounded-2xl border border-stone-200 p-4"><img src={request.imageUrl ?? "/samples/placeholder.svg"} alt="" className="h-16 w-16 rounded-xl object-cover" /><div className="flex-1"><div className="flex justify-between gap-2"><p className="font-bold">{request.petName}</p><span className="rounded-full bg-gold/15 px-2 py-1 text-xs text-gold">{statusLabel(request.status)}</span></div><p className="mt-1 text-xs text-stone-500">Solicitado em {new Date(request.createdAt).toLocaleDateString("pt-BR")}</p></div></article>)}</div>}</div>; }

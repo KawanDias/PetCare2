@@ -12,6 +12,8 @@ import {
   type User as FirebaseUser
 } from "firebase/auth";
 import { auth, type UserRole } from "@/lib/firebase";
+import { database } from "@/lib/firebase";
+import { ref, remove } from "firebase/database";
 import { apiFetch } from "@/lib/api";
 
 export const ADMIN_EMAIL = "kawangoleiro79@gmail.com";
@@ -220,9 +222,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     },
     toggleFavorite: async (item) => {
       if (!user) throw new Error("NOT_AUTHENTICATED");
-      const favorites = user.favorites.some((favorite) => favorite.id === item.id && favorite.type === item.type)
+      const isFavorite = user.favorites.some((favorite) => favorite.id === item.id && favorite.type === item.type);
+      const favorites = isFavorite
         ? user.favorites.filter((favorite) => !(favorite.id === item.id && favorite.type === item.type))
         : [...user.favorites, item];
+      if (isFavorite && item.type === "pet") {
+        await remove(ref(database, `usuarios/${encodeURIComponent(user.uid)}/favoritos/${encodeURIComponent(item.id)}`));
+      }
       await apiFetch("/api/profile", { method: "PATCH", body: JSON.stringify({ favorites }) });
       setUser({ ...user, favorites });
     }
