@@ -44,15 +44,23 @@ type PetFormData = {
 
 type AdoptionRequest = {
   id: string;
+  userId?: string;
   petId: string;
   petName: string;
   imageUrl?: string;
   fullName?: string;
   cpf?: string;
   phone?: string;
+  userEmail?: string;
   address?: string;
+  cep?: string;
+  street?: string;
+  neighborhood?: string;
+  number?: string;
+  city?: string;
+  state?: string;
   motivation?: string;
-  status: "pending" | "approved" | "completed" | "cancelled";
+  status: "pending" | "approved" | "negado" | "completed" | "cancelled";
   createdAt: string;
 };
 
@@ -125,7 +133,7 @@ export default function AdminPage() {
   }, []);
 
   const filteredPets = useMemo(() => pets.filter((pet) => pet.name.toLowerCase().includes(search.toLowerCase())), [pets, search]);
-  const pendingRequests = requests.filter((request) => request.status === "pending" || request.status === "approved");
+  const pendingRequests = requests.filter((request) => request.status === "pending");
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -186,16 +194,48 @@ export default function AdminPage() {
     }
   }
 
-  async function markAsAdopted(pet: Pet) {
+  async function markRequestAdopted(request: AdoptionRequest) {
+    const pet = pets.find((item) => item.id === request.petId);
+    if (!pet || !request.userId) return;
     if (!window.confirm(`Marcar "${pet.name}" como adotado? Ele deixará de aparecer na vitrine pública.`)) return;
     try {
+      await apiFetch(`/api/adoptions`, { method: "PATCH", body: JSON.stringify({ userId: request.userId, requestId: request.id, status: "approved" }) });
       const saved = await apiFetch<Pet>(`/api/pets/${encodeURIComponent(pet.id)}`, { method: "PUT", body: JSON.stringify({ ...pet, status: "adotado" }) });
       setPets((items) => items.map((item) => item.id === saved.id ? saved : item));
-      setRequests((items) => items.map((request) => request.petId === pet.id ? { ...request, status: "completed" } : request));
+      setRequests((items) => items.map((item) => item.id === request.id ? { ...item, status: "approved" } : item));
       setMessage(`${pet.name} foi marcado como adotado.`);
     } catch (error) {
       console.error("Erro ao marcar pet como adotado.", error);
       setMessage(error instanceof Error ? error.message : "Não foi possível concluir a adoção.");
+    }
+  }
+
+  async function updateRequestStatus(request: AdoptionRequest, status: "negado") {
+      if (!request.userId) return;
+      try {
+        await apiFetch("/api/adoptions", { method: "PATCH", body: JSON.stringify({ userId: request.userId, requestId: request.id, status }) });
+        setRequests((items) => items.map((item) => item.id === request.id ? { ...item, status } : item));
+        setMessage("Solicitação negada.");
+      } catch (error) {
+        console.error("Erro ao atualizar solicitação.", error);
+        setMessage("Não foi possível atualizar a solicitação.");
+      }
+    }
+
+  async function markAsAdopted(pet: Pet) {
+    const request = requests.find((item) => item.petId === pet.id && item.status === "pending");
+    if (request) {
+      await markRequestAdopted(request);
+      return;
+    }
+    if (!window.confirm(`Marcar "${pet.name}" como adotado? Ele deixará de aparecer na vitrine pública.`)) return;
+    try {
+      const saved = await apiFetch<Pet>(`/api/pets/${encodeURIComponent(pet.id)}`, { method: "PUT", body: JSON.stringify({ ...pet, status: "adotado" }) });
+      setPets((items) => items.map((item) => item.id === saved.id ? saved : item));
+      setMessage(`${pet.name} foi marcado como adotado.`);
+    } catch (error) {
+      console.error("Erro ao marcar pet como adotado.", error);
+      setMessage("Não foi possível concluir a adoção.");
     }
   }
 
@@ -216,7 +256,7 @@ export default function AdminPage() {
     {message && <p role="status" className="mt-5 rounded-xl border border-gold/30 bg-gold/10 p-3 text-sm text-gold">{message}</p>}
     {activeTab === "pets" && <section className="mt-6 rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-6"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-sans text-2xl uppercase">Pets cadastrados</h2><p className="text-sm text-stone-500">{filteredPets.length} resultado(s)</p></div><div className="relative sm:max-w-xs"><Search size={17} className="absolute left-3 top-3 text-stone-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar por nome" className="field pl-10" /></div></div><div className="mt-5 grid gap-3">{filteredPets.map((pet) => <div key={pet.id} role="link" tabIndex={0} onClick={() => router.push(`/pets/${encodeURIComponent(pet.id)}`)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); router.push(`/pets/${encodeURIComponent(pet.id)}`); } }} className="flex cursor-pointer flex-wrap items-center gap-3 rounded-2xl border border-stone-200 bg-white p-3"><img src={pet.imageUrls[0]} alt={`Foto de ${pet.name}`} className="h-14 w-14 rounded-xl object-cover" /><div className="min-w-0 flex-1"><p className="truncate font-semibold">{pet.name}</p><p className="text-sm text-stone-500">{pet.species} · {pet.breed} · {pet.age}</p>{pet.status === "adotado" && <span className="text-xs font-semibold text-green-700">Adotado</span>}{pet.status !== "adotado" && pet.emDestaque && <span className="inline-flex items-center gap-1 text-xs text-gold"><Check size={12} /> Em destaque</span>}</div>{pet.status !== "adotado" && <button title="Marcar como adotado" onClick={(event) => { event.stopPropagation(); void markAsAdopted(pet); }} className="min-h-11 rounded-xl border border-green-300 px-3 text-xs text-green-700 hover:bg-green-50">Marcar como adotado</button>}<button title="Editar" onClick={(event) => { event.stopPropagation(); setEditingId(pet.id); setActiveTab("create"); }} className="min-h-11 min-w-11 text-stone-500 hover:text-gold"><Edit3 size={17} /></button><button title="Excluir" onClick={(event) => { event.stopPropagation(); void removePet(pet); }} className="min-h-11 min-w-11 text-stone-500 hover:text-red-400"><Trash2 size={17} /></button></div>)}{filteredPets.length === 0 && <p className="text-sm text-stone-600">Nenhum pet cadastrado.</p>}</div></section>}
     {activeTab === "create" && <form key={editingId ?? "new"} onSubmit={save} className="mx-auto mt-6 grid max-w-3xl gap-3 rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-6"><h2 className="font-sans text-2xl uppercase">{editing ? "Atualizar pet" : "Cadastrar pet"}</h2>{field("name", "Nome do pet")}{select("species", "Espécie", choices.species)}{field("breed", "Raça (ex.: SRD / Vira-lata)")}{field("age", "Idade (ex.: 2 anos)")}{select("size", "Porte", choices.size)}{select("sex", "Sexo", choices.sex)}{field("coat", "Cor / Pelagem")}<div className="grid gap-3 sm:grid-cols-3">{select("vaccinated", "Vacinado?", choices.yesNo)}{select("neutered", "Castrado?", choices.yesNo)}{select("dewormed", "Vermifugado?", choices.yesNo)}</div>{field("temperament", "Personalidade / Temperamento")}<textarea name="description" value={formData.description} onChange={handleChange} placeholder="História / descrição detalhada" className="field min-h-28 w-full" required /><input name="images" type="file" accept="image/*" multiple onChange={handleImageChange} className="field w-full text-sm" />{selectedImages.length > 0 && <p className="text-xs text-gold">{selectedImages.length} imagem(ns) pronta(s) para envio.</p>}<p className="text-xs text-stone-500">Selecione de 1 a 5 fotos. As imagens são armazenadas em Base64.</p><label className="flex min-h-11 items-center gap-2 text-sm text-stone-600"><input name="emDestaque" type="checkbox" checked={formData.emDestaque} onChange={(event) => setFormData((current) => ({ ...current, emDestaque: event.target.checked }))} /> Em destaque na Home</label><Button className="min-h-11 w-full">{editing ? "Atualizar pet" : "Cadastrar pet"}</Button>{editing && <button type="button" onClick={() => setEditingId(null)} className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm text-stone-600">Cancelar edição</button>}</form>}
-    {activeTab === "adoptions" && <AdoptionsPanel requests={requests} pendingRequests={pendingRequests} onMarkAdopted={(petId) => { const pet = pets.find((item) => item.id === petId); if (pet) void markAsAdopted(pet); }} />}
+    {activeTab === "adoptions" && <AdoptionsPanel requests={requests} pendingRequests={pendingRequests} onMarkAdopted={(request) => void markRequestAdopted(request)} onDeny={(request) => void updateRequestStatus(request, "negado")} />}
   </div></main>;
 }
 
@@ -224,6 +264,7 @@ function TabButton({ active, children, onClick }: { active: boolean; children: R
   return <button type="button" onClick={onClick} className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition ${active ? "bg-gold text-stone-900 shadow-sm" : "border border-stone-200 bg-white text-stone-600 hover:border-gold/50 hover:text-gold"}`}>{children}</button>;
 }
 
-function AdoptionsPanel({ requests, pendingRequests, onMarkAdopted }: { requests: AdoptionRequest[]; pendingRequests: AdoptionRequest[]; onMarkAdopted: (petId: string) => void }) {
-  return <section className="mx-auto mt-6 max-w-5xl rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-6"><div className="flex items-end justify-between gap-3"><div><h2 className="font-sans text-2xl uppercase">Solicitações de adoção</h2><p className="text-sm text-stone-500">{pendingRequests.length} pendente(s)</p></div></div><div className="mt-5 grid gap-4">{requests.map((request) => <article key={request.id} className="rounded-2xl border border-stone-200 bg-white p-4"><div className="flex flex-wrap items-start gap-4"><img src={request.imageUrl || "/samples/placeholder.svg"} alt="" className="h-16 w-16 rounded-xl object-cover" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold">{request.petName}</h3><span className={`rounded-full px-2 py-1 text-xs ${request.status === "completed" ? "bg-green-100 text-green-700" : "bg-gold/15 text-gold"}`}>{request.status === "completed" ? "Concluída" : "Pendente"}</span></div><p className="mt-1 text-sm text-stone-600">{request.fullName || "Adotante não informado"} · {request.phone || "Telefone não informado"}</p><p className="mt-1 text-xs text-stone-500">{request.address || "Endereço não informado"}</p><p className="mt-3 text-sm text-stone-600">{request.motivation || "Sem justificativa informada."}</p></div></div><div className="mt-4 flex flex-wrap gap-2">{request.phone && <a href={`https://wa.me/${request.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white"><MessageCircle size={16} /> WhatsApp</a>}{request.status !== "completed" && <button type="button" onClick={() => onMarkAdopted(request.petId)} className="inline-flex items-center gap-2 rounded-xl border border-green-300 px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-50">Marcar como adotado</button>}</div></article>)}{requests.length === 0 && <div className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-stone-500"><Inbox className="mx-auto mb-2" />Nenhuma solicitação registrada.</div>}</div></section>;
+function AdoptionsPanel({ requests, pendingRequests, onMarkAdopted, onDeny }: { requests: AdoptionRequest[]; pendingRequests: AdoptionRequest[]; onMarkAdopted: (request: AdoptionRequest) => void; onDeny: (request: AdoptionRequest) => void }) {
+  const statusLabel = (status: AdoptionRequest["status"]) => status === "approved" || status === "completed" ? "Aprovado / Adotado" : status === "negado" || status === "cancelled" ? "Negado" : "Pendente";
+  return <section className="mx-auto mt-6 max-w-5xl rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-6"><div className="flex items-end justify-between gap-3"><div><h2 className="font-sans text-2xl uppercase">Solicitações de adoção</h2><p className="text-sm text-stone-500">{pendingRequests.length} pendente(s)</p></div></div><div className="mt-5 grid gap-4">{requests.map((request) => { const address = [request.street, request.number, request.neighborhood, request.city && `${request.city}/${request.state}`, request.cep].filter(Boolean).join(" · ") || request.address || "Endereço não informado"; const whatsapp = request.phone ? `https://wa.me/55${request.phone.replace(/\D/g, "").replace(/^55/, "")}?text=${encodeURIComponent(`Olá ${request.fullName || ""}, sobre sua solicitação de adoção para o pet ${request.petName}...`)}` : ""; const email = request.userEmail ? `mailto:${request.userEmail}?subject=${encodeURIComponent(`Solicitação de adoção - ${request.petName}`)}` : ""; return <article key={request.id} className="rounded-2xl border border-stone-200 bg-white p-4"><div className="flex flex-wrap items-start gap-4"><img src={request.imageUrl || "/samples/placeholder.svg"} alt="" className="h-16 w-16 rounded-xl object-cover" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold">{request.petName}</h3><span className={`rounded-full px-2 py-1 text-xs ${request.status === "approved" || request.status === "completed" ? "bg-green-100 text-green-700" : request.status === "negado" || request.status === "cancelled" ? "bg-red-100 text-red-700" : "bg-gold/15 text-gold"}`}>{statusLabel(request.status)}</span></div><p className="mt-1 text-sm text-stone-700"><strong>Adotante:</strong> {request.fullName || "Não informado"} · <strong>CPF:</strong> {request.cpf || "Não informado"}</p><p className="mt-1 text-sm text-stone-600"><strong>Telefone:</strong> {request.phone || "Não informado"} · <strong>E-mail:</strong> {request.userEmail || "Não informado"}</p><p className="mt-1 text-xs text-stone-500"><strong>Endereço:</strong> {address}</p><p className="mt-3 text-sm text-stone-600"><strong>Motivação:</strong> {request.motivation || "Não informada."}</p></div></div><div className="mt-4 flex flex-wrap gap-2">{whatsapp && <a href={whatsapp} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white"><MessageCircle size={16} /> WhatsApp</a>}{email && <a href={email} className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50">✉ E-mail</a>}{request.status === "pending" && <><button type="button" onClick={() => onMarkAdopted(request)} className="inline-flex items-center gap-2 rounded-xl border border-green-300 px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-50">✓ Marcar como adotado</button><button type="button" onClick={() => onDeny(request)} className="inline-flex items-center gap-2 rounded-xl border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">✕ Negar adoção</button></>}</div></article>; })}{requests.length === 0 && <div className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-stone-500"><Inbox className="mx-auto mb-2" />Nenhuma solicitação registrada.</div>}</div></section>;
 }

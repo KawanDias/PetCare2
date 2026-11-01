@@ -16,7 +16,8 @@ type AdoptionRequest = {
   city: string;
   state: string;
   motivation: string;
-  status: "pending";
+  status: "pending" | "approved" | "negado" | "completed";
+  userEmail?: string;
   createdAt: string;
 };
 
@@ -76,7 +77,8 @@ export async function POST(request: NextRequest) {
       motivation: payload.motivation.trim(),
       status: "pending" as const,
       createdAt: new Date().toISOString(),
-      userId: identity.uid
+      userId: identity.uid,
+      userEmail: identity.email ?? ""
     };
     const emailResponse = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -108,6 +110,28 @@ export async function POST(request: NextRequest) {
     }
     const created = await databaseRequest<{ name: string }>(`users/${identity.uid}/adoptionRequests`, { method: "POST", body: JSON.stringify(item) }, tokenFromRequest(request));
     return Response.json({ id: created.name, ...item }, { status: 201 });
+  } catch (error) {
+    return jsonError(error);
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const identity = await authenticate(request);
+    if (!identity?.isAdmin) throw new ApiError(403, "Apenas administradores podem atualizar solicitações.");
+    const payload = await request.json() as { userId?: string; requestId?: string; status?: AdoptionRequest["status"] };
+    if (!payload.userId || !payload.requestId || !payload.status || !["approved", "negado", "completed"].includes(payload.status)) {
+      throw new ApiError(400, "Solicitação ou status inválido.");
+    }
+    const token = tokenFromRequest(request);
+    const current = await databaseRequest<Omit<AdoptionRequest, "id"> | null>(`users/${encodeURIComponent(payload.userId)}/adoptionRequests/${encodeURIComponent(payload.requestId)}`, {}, token);
+    if (!current) throw new ApiError(404, "Solicitação não encontrada.");
+    const updated = { ...current, status: payload.status };
+    await databaseRequest(`users/${encodeURIComponent(payload.userId)}/adoptionRequests/${encodeURIComponent(payload.requestId)}`, { method: "PUT", body: JSON.stringify(updated) }, token);
+    if (payload.status === "approved" || payload.status === "completed") {
+      await databaseRequest(`usuarios/${encodeURIComponent(payload.userId)}/historico/${encodeURIComponent(payload.requestId)}`, { method: "PUT", body: JSON.stringify(updated) }, token);
+    }
+    return Response.json({ id: payload.requestId, ...updated }, { status: 200 });
   } catch (error) {
     return jsonError(error);
   }
