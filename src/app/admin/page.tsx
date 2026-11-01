@@ -46,10 +46,15 @@ type AdoptionRequest = {
   id: string;
   userId?: string;
   petId: string;
-  petName: string;
+  petNome?: string;
+  petFoto?: string;
+  nomeAdotante?: string;
+  petName?: string;
   imageUrl?: string;
   fullName?: string;
   cpf?: string;
+  telefone?: string;
+  email?: string;
   phone?: string;
   userEmail?: string;
   address?: string;
@@ -59,9 +64,11 @@ type AdoptionRequest = {
   number?: string;
   city?: string;
   state?: string;
+  endereco?: { cep?: string; rua?: string; bairro?: string; numero?: string; cidade?: string; uf?: string };
+  justificativa?: string;
   motivation?: string;
-  status: "pending" | "approved" | "negado" | "completed" | "cancelled";
-  createdAt: string;
+  status: "pendente" | "pending" | "approved" | "negado" | "completed" | "cancelled";
+  dataCriacao: string;
 };
 
 type AdminTab = "pets" | "create" | "adoptions";
@@ -133,7 +140,7 @@ export default function AdminPage() {
   }, []);
 
   const filteredPets = useMemo(() => pets.filter((pet) => pet.name.toLowerCase().includes(search.toLowerCase())), [pets, search]);
-  const pendingRequests = requests.filter((request) => request.status === "pending");
+  const pendingRequests = requests.filter((request) => request.status === "pending" || request.status === "pendente");
 
   function handleImageChange(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
@@ -199,7 +206,7 @@ export default function AdminPage() {
     if (!pet || !request.userId) return;
     if (!window.confirm(`Marcar "${pet.name}" como adotado? Ele deixará de aparecer na vitrine pública.`)) return;
     try {
-      await apiFetch(`/api/adoptions`, { method: "PATCH", body: JSON.stringify({ userId: request.userId, requestId: request.id, status: "approved" }) });
+      await apiFetch(`/api/adoptions`, { method: "PATCH", body: JSON.stringify({ requestId: request.id, status: "approved" }) });
       const saved = await apiFetch<Pet>(`/api/pets/${encodeURIComponent(pet.id)}`, { method: "PUT", body: JSON.stringify({ ...pet, status: "adotado" }) });
       setPets((items) => items.map((item) => item.id === saved.id ? saved : item));
       setRequests((items) => items.map((item) => item.id === request.id ? { ...item, status: "approved" } : item));
@@ -213,7 +220,7 @@ export default function AdminPage() {
   async function updateRequestStatus(request: AdoptionRequest, status: "negado") {
       if (!request.userId) return;
       try {
-        await apiFetch("/api/adoptions", { method: "PATCH", body: JSON.stringify({ userId: request.userId, requestId: request.id, status }) });
+        await apiFetch("/api/adoptions", { method: "PATCH", body: JSON.stringify({ requestId: request.id, status }) });
         setRequests((items) => items.map((item) => item.id === request.id ? { ...item, status } : item));
         setMessage("Solicitação negada.");
       } catch (error) {
@@ -223,7 +230,7 @@ export default function AdminPage() {
     }
 
   async function markAsAdopted(pet: Pet) {
-    const request = requests.find((item) => item.petId === pet.id && item.status === "pending");
+    const request = requests.find((item) => item.petId === pet.id && (item.status === "pending" || item.status === "pendente"));
     if (request) {
       await markRequestAdopted(request);
       return;
@@ -266,5 +273,5 @@ function TabButton({ active, children, onClick }: { active: boolean; children: R
 
 function AdoptionsPanel({ requests, pendingRequests, onMarkAdopted, onDeny }: { requests: AdoptionRequest[]; pendingRequests: AdoptionRequest[]; onMarkAdopted: (request: AdoptionRequest) => void; onDeny: (request: AdoptionRequest) => void }) {
   const statusLabel = (status: AdoptionRequest["status"]) => status === "approved" || status === "completed" ? "Aprovado / Adotado" : status === "negado" || status === "cancelled" ? "Negado" : "Pendente";
-  return <section className="mx-auto mt-6 max-w-5xl rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-6"><div className="flex items-end justify-between gap-3"><div><h2 className="font-sans text-2xl uppercase">Solicitações de adoção</h2><p className="text-sm text-stone-500">{pendingRequests.length} pendente(s)</p></div></div><div className="mt-5 grid gap-4">{requests.map((request) => { const address = [request.street, request.number, request.neighborhood, request.city && `${request.city}/${request.state}`, request.cep].filter(Boolean).join(" · ") || request.address || "Endereço não informado"; const whatsapp = request.phone ? `https://wa.me/55${request.phone.replace(/\D/g, "").replace(/^55/, "")}?text=${encodeURIComponent(`Olá ${request.fullName || ""}, sobre sua solicitação de adoção para o pet ${request.petName}...`)}` : ""; const email = request.userEmail ? `mailto:${request.userEmail}?subject=${encodeURIComponent(`Solicitação de adoção - ${request.petName}`)}` : ""; return <article key={request.id} className="rounded-2xl border border-stone-200 bg-white p-4"><div className="flex flex-wrap items-start gap-4"><img src={request.imageUrl || "/samples/placeholder.svg"} alt="" className="h-16 w-16 rounded-xl object-cover" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold">{request.petName}</h3><span className={`rounded-full px-2 py-1 text-xs ${request.status === "approved" || request.status === "completed" ? "bg-green-100 text-green-700" : request.status === "negado" || request.status === "cancelled" ? "bg-red-100 text-red-700" : "bg-gold/15 text-gold"}`}>{statusLabel(request.status)}</span></div><p className="mt-1 text-sm text-stone-700"><strong>Adotante:</strong> {request.fullName || "Não informado"} · <strong>CPF:</strong> {request.cpf || "Não informado"}</p><p className="mt-1 text-sm text-stone-600"><strong>Telefone:</strong> {request.phone || "Não informado"} · <strong>E-mail:</strong> {request.userEmail || "Não informado"}</p><p className="mt-1 text-xs text-stone-500"><strong>Endereço:</strong> {address}</p><p className="mt-3 text-sm text-stone-600"><strong>Motivação:</strong> {request.motivation || "Não informada."}</p></div></div><div className="mt-4 flex flex-wrap gap-2">{whatsapp && <a href={whatsapp} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white"><MessageCircle size={16} /> WhatsApp</a>}{email && <a href={email} className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50">✉ E-mail</a>}{request.status === "pending" && <><button type="button" onClick={() => onMarkAdopted(request)} className="inline-flex items-center gap-2 rounded-xl border border-green-300 px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-50">✓ Marcar como adotado</button><button type="button" onClick={() => onDeny(request)} className="inline-flex items-center gap-2 rounded-xl border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">✕ Negar adoção</button></>}</div></article>; })}{requests.length === 0 && <div className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-stone-500"><Inbox className="mx-auto mb-2" />Nenhuma solicitação registrada.</div>}</div></section>;
+  return <section className="mx-auto mt-6 max-w-5xl rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-6"><div className="flex items-end justify-between gap-3"><div><h2 className="font-sans text-2xl uppercase">Solicitações de adoção</h2><p className="text-sm text-stone-500">{pendingRequests.length} pendente(s)</p></div></div><div className="mt-5 grid gap-4">{requests.map((request) => { const address = [request.street, request.number, request.neighborhood, request.city && `${request.city}/${request.state}`, request.cep].filter(Boolean).join(" · ") || request.address || "Endereço não informado"; const whatsapp = request.phone ? `https://wa.me/55${request.phone.replace(/\D/g, "").replace(/^55/, "")}?text=${encodeURIComponent(`Olá ${request.fullName || ""}, sobre sua solicitação de adoção para o pet ${request.petName}...`)}` : ""; const email = request.userEmail ? `mailto:${request.userEmail}?subject=${encodeURIComponent(`Solicitação de adoção - ${request.petName}`)}` : ""; return <article key={request.id} className="rounded-2xl border border-stone-200 bg-white p-4"><div className="flex flex-wrap items-start gap-4"><img src={request.imageUrl || "/samples/placeholder.svg"} alt="" className="h-16 w-16 rounded-xl object-cover" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-bold">{request.petName}</h3><span className={`rounded-full px-2 py-1 text-xs ${request.status === "approved" || request.status === "completed" ? "bg-green-100 text-green-700" : request.status === "negado" || request.status === "cancelled" ? "bg-red-100 text-red-700" : "bg-gold/15 text-gold"}`}>{statusLabel(request.status)}</span></div><p className="mt-1 text-sm text-stone-700"><strong>Adotante:</strong> {request.fullName || "Não informado"} · <strong>CPF:</strong> {request.cpf || "Não informado"}</p><p className="mt-1 text-sm text-stone-600"><strong>Telefone:</strong> {request.phone || "Não informado"} · <strong>E-mail:</strong> {request.userEmail || "Não informado"}</p><p className="mt-1 text-xs text-stone-500"><strong>Endereço:</strong> {address}</p><p className="mt-3 text-sm text-stone-600"><strong>Motivação:</strong> {request.motivation || "Não informada."}</p></div></div><div className="mt-4 flex flex-wrap gap-2">{whatsapp && <a href={whatsapp} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-green-600 px-3 py-2 text-sm font-semibold text-white"><MessageCircle size={16} /> WhatsApp</a>}{email && <a href={email} className="inline-flex items-center gap-2 rounded-xl border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50">✉ E-mail</a>}{  (request.status === "pending" || request.status === "pendente") && <><button type="button" onClick={() => onMarkAdopted(request)} className="inline-flex items-center gap-2 rounded-xl border border-green-300 px-3 py-2 text-sm font-semibold text-green-700 hover:bg-green-50">✓ Marcar como adotado</button><button type="button" onClick={() => onDeny(request)} className="inline-flex items-center gap-2 rounded-xl border border-red-300 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50">✕ Negar adoção</button></>}</div></article>; })}{requests.length === 0 && <div className="rounded-2xl border border-dashed border-stone-300 p-8 text-center text-stone-500"><Inbox className="mx-auto mb-2" />Nenhuma solicitação registrada.</div>}</div></section>;
 }

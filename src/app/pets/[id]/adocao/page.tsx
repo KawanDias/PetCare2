@@ -95,19 +95,14 @@ export default function AdoptionPage({ params }: { params: Promise<{ id: string 
         method: "POST",
         body: JSON.stringify({
           petId: pet.id,
-          petName: pet.name,
-          imageUrl: pet.imageUrls?.[0] ?? pet.image ?? "",
-          fullName: String(data.get("fullName") ?? ""),
+          petNome: pet.name,
+          petFoto: pet.imageUrls?.[0] ?? pet.image ?? "",
+          nomeAdotante: String(data.get("fullName") ?? ""),
           cpf,
-          phone,
-          address: `${address.street}, ${address.number} - ${address.neighborhood}, ${address.city}/${address.state} - CEP ${address.cep}`,
-          cep: address.cep,
-          street: address.street,
-          neighborhood: address.neighborhood,
-          number: address.number,
-          city: address.city,
-          state: address.state,
-          motivation: String(data.get("motivation") ?? "")
+          telefone: phone,
+          email: user?.email ?? "",
+          endereco: { cep: address.cep, rua: address.street, bairro: address.neighborhood, numero: address.number, cidade: address.city, uf: address.state },
+          justificativa: String(data.get("motivation") ?? "")
         })
       });
       event.currentTarget.reset();
