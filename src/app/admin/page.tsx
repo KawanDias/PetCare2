@@ -132,7 +132,7 @@ export default function AdminPage() {
       setEditingId(null); setSelectedImages([]); form.reset(); setFormData(emptyFormData); setMessage(`${pet.name} salvo com sucesso.`);
     } catch (error) {
       console.error("Erro ao gravar pet.", error);
-      setMessage("Não foi possível salvar o pet. Verifique o Console e as regras do banco.");
+      setMessage(error instanceof Error ? error.message : "Não foi possível salvar o pet.");
     }
   }
 

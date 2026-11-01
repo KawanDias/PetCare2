@@ -55,7 +55,7 @@ export async function databaseRequest<T>(path: string, init: RequestInit = {}, t
   headers.set("Content-Type", "application/json");
   const url = new URL(getDatabaseUrl());
   url.pathname = `${url.pathname.replace(/\/$/, "")}/${path}.json`;
-  if (token) url.searchParams.set("access_token", token);
+  if (token) url.searchParams.set("auth", token);
   let response: Response;
   try {
     response = await fetch(url, { ...init, headers, cache: "no-store" });
