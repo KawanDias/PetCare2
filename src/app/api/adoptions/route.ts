@@ -9,6 +9,12 @@ type AdoptionRequest = {
   cpf: string;
   phone: string;
   address: string;
+  cep: string;
+  street: string;
+  neighborhood: string;
+  number: string;
+  city: string;
+  state: string;
   motivation: string;
   status: "pending";
   createdAt: string;
@@ -35,6 +41,10 @@ export async function POST(request: NextRequest) {
     }
     const cpf = payload.cpf.replace(/\D/g, "");
     if (cpf.length !== 11) throw new ApiError(400, "Informe um CPF válido com 11 dígitos.");
+    const cep = payload.cep?.replace(/\D/g, "") ?? "";
+    if (cep.length !== 8 || !payload.street || !payload.neighborhood || !payload.number || !payload.city || !payload.state) {
+      throw new ApiError(400, "Informe um endereço completo e um CEP válido.");
+    }
     const pet = await databaseRequest<Record<string, unknown> | null>(`pets/${encodeURIComponent(payload.petId)}`);
     if (!pet) throw new ApiError(404, "Pet não encontrado.");
     if (!process.env.RESEND_API_KEY) throw new ApiError(503, "O envio de e-mail não está configurado.");
@@ -46,6 +56,12 @@ export async function POST(request: NextRequest) {
       cpf,
       phone: payload.phone.trim(),
       address: payload.address.trim(),
+      cep,
+      street: payload.street.trim(),
+      neighborhood: payload.neighborhood.trim(),
+      number: payload.number.trim(),
+      city: payload.city.trim(),
+      state: payload.state.trim().toUpperCase(),
       motivation: payload.motivation.trim(),
       status: "pending" as const,
       createdAt: new Date().toISOString(),
@@ -64,6 +80,11 @@ export async function POST(request: NextRequest) {
           `CPF: ${item.cpf}`,
           `Telefone: ${item.phone}`,
           `Endereço: ${item.address}`,
+          `CEP: ${item.cep}`,
+          `Rua: ${item.street}`,
+          `Número: ${item.number}`,
+          `Bairro: ${item.neighborhood}`,
+          `Cidade/UF: ${item.city}/${item.state}`,
           `Motivação: ${item.motivation}`,
           `Usuário Firebase: ${identity.uid}`
         ].join("\n")
