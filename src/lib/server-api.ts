@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 
 export const ADMIN_EMAIL = "kawangoleiro79@gmail.com";
-const databaseUrl = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL?.replace(/\/$/, "");
+const databaseUrl = (process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL?.trim().replace(/^['"]|['"]$/g, "").trim() || "https://petcare-bf251-default-rtdb.firebaseio.com").replace(/\/$/, "");
 
 type FirebaseIdentity = { localId: string; email?: string };
 
