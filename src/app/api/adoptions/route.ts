@@ -53,8 +53,20 @@ export async function GET(request: NextRequest) {
   try {
     const identity = await authenticate(request);
     if (!identity) throw new ApiError(401, "Autenticação necessária.");
-    const value = await databaseRequest<Record<string, Partial<AdoptionRequest>> | null>("solicitacoes", {}, tokenFromRequest(request));
-    const requests = Object.entries(value ?? {}).map(([id, item]) => normalizeRequest(id, item));
+    const token = tokenFromRequest(request);
+    let requests: ReturnType<typeof normalizeRequest>[] = [];
+    try {
+      const value = await databaseRequest<Record<string, Partial<AdoptionRequest>> | null>("solicitacoes", {}, token);
+      requests = Object.entries(value ?? {}).map(([id, item]) => normalizeRequest(id, item));
+    } catch (error) {
+      console.error("Não foi possível ler solicitacoes; tentando registros legados.", error);
+    }
+    if (requests.length === 0) {
+      const users = await databaseRequest<Record<string, { adoptionRequests?: Record<string, Partial<AdoptionRequest>> }>>("users", {}, token);
+      requests = Object.entries(users ?? {}).flatMap(([userId, user]) =>
+        Object.entries(user.adoptionRequests ?? {}).map(([id, item]) => normalizeRequest(id, { ...item, userId }))
+      );
+    }
     return Response.json(
       requests.filter((item) => identity.isAdmin || item.userId === identity.uid).sort((a, b) => b.dataCriacao.localeCompare(a.dataCriacao)),
       { status: 200 }
