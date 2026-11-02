@@ -95,19 +95,33 @@ export default function AdoptionPage({ params }: { params: Promise<{ id: string 
     setMessage("");
     const data = new FormData(event.currentTarget);
     try {
+      const nome = fullName.trim();
+      const justificativa = String(data.get("motivation") ?? "").trim();
+      const cep = address.cep;
+      const rua = address.street;
+      const bairro = address.neighborhood;
+      const numero = address.number;
       await push(ref(database, "solicitacoes"), {
         petId: id,
         petNome: pet.name,
         petFoto: pet.imageUrls?.[0] ?? pet.image ?? "",
-        nomeAdotante: fullName.trim(),
+        nomeAdotante: nome,
+        nome,
         cpf,
         telefone: phone,
         email: user?.email ?? "",
-        endereco: { cep: address.cep, rua: address.street, bairro: address.neighborhood, numero: address.number, cidade: address.city, uf: address.state },
-        justificativa: String(data.get("motivation") ?? ""),
+        usuarioId: user.uid,
+        userId: user.uid,
+        endereco: { cep, rua, bairro, numero, cidade: address.city, uf: address.state },
+        cep,
+        rua,
+        bairro,
+        numero,
+        enderecoCompleto: `${rua}, nº ${numero} - ${bairro} (CEP: ${cep})`,
+        justificativa,
+        motivacao: justificativa,
         status: "pendente",
         dataCriacao: new Date().toISOString(),
-        userId: user.uid
       });
       setFullName("");
       setCpf("");

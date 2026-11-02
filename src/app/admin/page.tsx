@@ -109,6 +109,50 @@ function getPetId(pet: Pet & { key?: string }) {
   return String(pet.id || pet.key || "").trim();
 }
 
+function normalizeAdoptionRequest(id: string, value: Partial<AdoptionRequest> & Record<string, unknown>): AdoptionRequest {
+  const address = value.endereco && typeof value.endereco === "object"
+    ? value.endereco as NonNullable<AdoptionRequest["endereco"]>
+    : undefined;
+  const street = String(value.rua ?? address?.rua ?? value.street ?? "");
+  const neighborhood = String(value.bairro ?? address?.bairro ?? value.neighborhood ?? "");
+  const number = String(value.numero ?? address?.numero ?? value.number ?? "");
+  const cep = String(value.cep ?? address?.cep ?? "");
+  const userId = String(value.userId ?? value.usuarioId ?? value.uid ?? "");
+  const petName = String(value.petNome ?? value.petName ?? "");
+  const imageUrl = String(value.petFoto ?? value.imageUrl ?? "");
+  const fullName = String(value.nomeAdotante ?? value.nome ?? value.fullName ?? "");
+  const phone = String(value.telefone ?? value.phone ?? "");
+  const email = String(value.email ?? value.userEmail ?? "");
+  const motivation = String(value.justificativa ?? value.motivacao ?? value.motivation ?? "");
+  return {
+    ...value,
+    id,
+    userId,
+    petId: String(value.petId ?? ""),
+    petNome: petName,
+    petFoto: imageUrl,
+    nomeAdotante: fullName,
+    petName,
+    imageUrl,
+    fullName,
+    cpf: String(value.cpf ?? ""),
+    telefone: phone,
+    phone,
+    email,
+    userEmail: email,
+    endereco: { cep, rua: street, bairro: neighborhood, numero: number, cidade: address?.cidade, uf: address?.uf },
+    cep,
+    street,
+    neighborhood,
+    number,
+    address: String(value.enderecoCompleto ?? (street ? `${street}, nº ${number} - ${neighborhood} (CEP: ${cep})` : value.address ?? "")),
+    justificativa: motivation,
+    motivation,
+    status: (value.status ?? "pendente") as AdoptionRequest["status"],
+    dataCriacao: String(value.dataCriacao ?? value.createdAt ?? "")
+  };
+}
+
 export default function AdminPage() {
   const { user, role, loading } = useAuth();
   const router = useRouter();
@@ -138,7 +182,7 @@ export default function AdminPage() {
     const requestsRef = ref(database, "solicitacoes");
     const unsubscribe = onValue(requestsRef, (snapshot) => {
       const data = snapshot.val() as Record<string, Partial<AdoptionRequest>> | null;
-      setRequests(Object.entries(data ?? {}).map(([id, request]) => ({ ...request, id })) as AdoptionRequest[]);
+      setRequests(Object.entries(data ?? {}).map(([id, request]) => normalizeAdoptionRequest(id, request as Partial<AdoptionRequest> & Record<string, unknown>)));
     }, (error) => {
       console.error("Erro ao escutar solicitações em tempo real.", error);
       void apiFetch<AdoptionRequest[]>("/api/adoptions")
