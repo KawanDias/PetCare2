@@ -89,9 +89,10 @@ export default function AdoptionPage({ params }: { params: Promise<{ id: string 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!pet || !user) return;
+    const form = event.currentTarget;
     setSending(true);
     setMessage("");
-    const data = new FormData(event.currentTarget);
+    const data = new FormData(form);
     try {
       await push(ref(database, "solicitacoes"), {
         petId: id,
@@ -107,7 +108,7 @@ export default function AdoptionPage({ params }: { params: Promise<{ id: string 
         dataCriacao: new Date().toISOString(),
         userId: user.uid
       });
-      event.currentTarget.reset();
+      form.reset();
       setCpf("");
       setPhone("");
       setAddress({ cep: "", street: "", neighborhood: "", number: "", city: "", state: "" });
