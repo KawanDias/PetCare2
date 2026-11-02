@@ -16,6 +16,11 @@ const statusLabel = (status: string) => {
   if (["negado", "recusado", "cancelled"].includes(status)) return "Negada";
   return "Em andamento";
 };
+const statusClass = (status: string) => {
+  if (["approved", "aprovado", "adotado", "completed"].includes(status)) return "border border-green-300 bg-green-50 text-green-700";
+  if (["negado", "recusado", "cancelled"].includes(status)) return "border border-red-300 bg-red-50 text-red-700";
+  return "border border-amber-300 bg-amber-50 text-amber-700";
+};
 const isFinalized = (status: string) => ["approved", "aprovado", "adotado", "completed", "negado", "recusado", "cancelled"].includes(status);
 
 export default function ProfilePage() {
@@ -122,6 +127,6 @@ function RequestsPanel({ requests, setRequests }: { requests: AdoptionRequest[];
         Solicitações Finalizadas ({finishedRequests.length})
       </button>
     </div>
-    {visibleRequests.length === 0 ? <p className="mt-5 text-stone-500">{section === "active" ? "Você não possui solicitações ativas." : "Você não possui solicitações finalizadas."}</p> : <div className="mt-5 space-y-3">{visibleRequests.map((request) => <article key={request.id} className="relative flex gap-4 rounded-2xl border border-stone-200 p-4"><img src={request.imageUrl || "/samples/placeholder.svg"} alt="" className="h-16 w-16 rounded-xl object-cover" /><div className="min-w-0 flex-1 pr-14"><div className="flex flex-wrap items-start justify-between gap-2"><p className="min-w-0 truncate pr-2 font-bold">{request.petName}</p><span className="shrink-0 rounded-full bg-gold/15 px-2 py-1 text-xs text-gold">{statusLabel(request.status)}</span></div><p className="mt-1 text-xs text-stone-500">Solicitado em {request.createdAt ? new Date(request.createdAt).toLocaleDateString("pt-BR") : "Data não informada"}</p></div>{section === "finished" && <button type="button" onClick={(event) => void deleteRequest(request, event)} aria-label="Excluir solicitação finalizada" className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full bg-red-50 text-lg leading-none text-red-500 hover:bg-red-100 hover:text-red-700">×</button>}</article>)}</div>}
+    {visibleRequests.length === 0 ? <p className="mt-5 text-stone-500">{section === "active" ? "Você não possui solicitações ativas." : "Você não possui solicitações finalizadas."}</p> : <div className="mt-5 space-y-3">{visibleRequests.map((request) => <article key={request.id} className="relative flex gap-4 rounded-2xl border border-stone-200 p-4"><img src={request.imageUrl || "/samples/placeholder.svg"} alt="" className="h-16 w-16 rounded-xl object-cover" /><div className="min-w-0 flex-1 pr-14"><div className="flex flex-wrap items-start justify-between gap-2"><p className="min-w-0 truncate pr-2 font-bold">{request.petName}</p><span className={`shrink-0 rounded-full px-2 py-1 text-xs ${statusClass(request.status)}`}>{statusLabel(request.status)}</span></div><p className="mt-1 text-xs text-stone-500">Solicitado em {request.createdAt ? new Date(request.createdAt).toLocaleDateString("pt-BR") : "Data não informada"}</p></div>{section === "finished" && <button type="button" onClick={(event) => void deleteRequest(request, event)} aria-label="Excluir solicitação finalizada" className="absolute right-3 top-3 z-10 grid h-8 w-8 place-items-center rounded-full bg-red-50 text-lg leading-none text-red-500 hover:bg-red-100 hover:text-red-700">×</button>}</article>)}</div>}
   </div>;
 }
