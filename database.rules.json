@@ -60,7 +60,7 @@
       }
     },
     "solicitacoes": {
-      ".read": "auth != null && auth.token.email == 'kawangoleiro79@gmail.com'",
+      ".read": "auth != null && (auth.token.email == 'kawangoleiro79@gmail.com' || (query.orderByChild == 'userId' && query.equalTo == auth.uid))",
       ".indexOn": ["status", "dataCriacao", "userId", "usuarioId"],
       "$requestId": {
         ".read": "auth != null && (data.child('userId').val() == auth.uid || data.child('usuarioId').val() == auth.uid || data.child('uid').val() == auth.uid || auth.token.email == 'kawangoleiro79@gmail.com')",

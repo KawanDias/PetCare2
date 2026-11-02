@@ -4,13 +4,19 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { Check, ChevronRight, Heart, Home, LogOut, MapPin, Shield, UserRound } from "lucide-react";
 import { useAuth, type UserAddress } from "@/components/AuthProvider";
-import { apiFetch } from "@/lib/api";
+import { database } from "@/lib/firebase";
+import { equalTo, onValue, orderByChild, ref, remove, query } from "firebase/database";
 
 type Tab = "data" | "address" | "favorites" | "adoptions" | "security";
-type AdoptionRequest = { id: string; petId: string; petName: string; imageUrl?: string; status: "pending" | "approved" | "completed" | "cancelled"; createdAt: string };
-const tabs: Array<[Tab, string, typeof UserRound]> = [["data", "Meus Dados", UserRound], ["address", "Endereço", MapPin], ["favorites", "Pets Favoritos", Heart], ["adoptions", "Minhas Adoções", Heart], ["security", "Segurança", Shield]];
+type AdoptionRequest = { id: string; petId: string; petName: string; imageUrl?: string; status: string; createdAt: string };
+const tabs: Array<[Tab, string, typeof UserRound]> = [["data", "Meus Dados", UserRound], ["address", "Endereço", MapPin], ["favorites", "Pets Favoritos", Heart], ["adoptions", "Minhas Solicitações", Heart], ["security", "Segurança", Shield]];
 const emptyAddress: UserAddress = { cep: "", street: "", number: "", neighborhood: "", city: "", reference: "" };
-const statusLabel = (status: AdoptionRequest["status"]) => ({ pending: "Em análise", approved: "Aprovado", completed: "Concluído", cancelled: "Cancelado" }[status]);
+const statusLabel = (status: string) => {
+  if (["approved", "aprovado", "adotado", "completed"].includes(status)) return "Aprovado / Adotado";
+  if (["negado", "recusado", "cancelled"].includes(status)) return "Negado";
+  return "Pendente / Em andamento";
+};
+const isFinalized = (status: string) => ["approved", "aprovado", "adotado", "completed", "negado", "recusado", "cancelled"].includes(status);
 
 export default function ProfilePage() {
   const { user, loading, updateProfile, changePassword, logout } = useAuth();
@@ -24,7 +30,22 @@ export default function ProfilePage() {
     if (!user) return;
     setProfile({ name: user.displayName, phone: user.phone ?? "", cpf: user.cpf ?? "", birthDate: user.birthDate ?? "" });
     setAddress(user.address ?? emptyAddress);
-    void apiFetch<AdoptionRequest[]>("/api/adoptions").then(setRequests).catch((error) => { console.error("Erro ao carregar solicitações de adoção.", error); setNotice("Não foi possível carregar suas adoções."); });
+    const requestsQuery = query(ref(database, "solicitacoes"), orderByChild("userId"), equalTo(user.uid));
+    const unsubscribe = onValue(requestsQuery, (snapshot) => {
+      const data = snapshot.val() as Record<string, Record<string, unknown>> | null;
+      setRequests(Object.entries(data ?? {}).map(([id, value]) => ({
+        id,
+        petId: String(value.petId ?? ""),
+        petName: String(value.petNome ?? value.petName ?? "Pet"),
+        imageUrl: String(value.petFoto ?? value.imageUrl ?? ""),
+        status: String(value.status ?? "pendente").toLowerCase(),
+        createdAt: String(value.dataCriacao ?? value.createdAt ?? "")
+      })));
+    }, (error) => {
+      console.error("Erro ao carregar solicitações do usuário.", error);
+      setNotice("Não foi possível carregar suas solicitações.");
+    });
+    return unsubscribe;
   }, [user]);
 
   if (loading) return <main className="grid min-h-screen place-items-center">Carregando...</main>;
@@ -42,11 +63,11 @@ export default function ProfilePage() {
         {tab === "data" && <form onSubmit={saveProfile} className="grid gap-4 sm:grid-cols-2"><Title text="Meus Dados" /><label>Nome completo<input className="field mt-2" value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} required /></label><label>Telefone / WhatsApp<input className="field mt-2" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} /></label><label>CPF<input className="field mt-2" value={profile.cpf} onChange={(e) => setProfile({ ...profile, cpf: e.target.value })} /></label><label>Data de nascimento<input type="date" className="field mt-2" value={profile.birthDate} onChange={(e) => setProfile({ ...profile, birthDate: e.target.value })} /></label><button className="rounded-xl bg-gold px-5 py-3 font-bold text-white sm:col-span-2">Salvar alterações</button></form>}
         {tab === "address" && <AddressPanel address={address} setAddress={setAddress} onSave={saveAddress} />}
         {tab === "favorites" && <FavoritesPanel user={user} />}
-        {tab === "adoptions" && <RequestsPanel title="Minhas Adoções" requests={requests.filter((request) => request.status === "pending" || request.status === "approved")} empty="Você ainda não iniciou nenhum processo de adoção." />}
+        {tab === "adoptions" && <RequestsPanel title="Minhas Solicitações" requests={requests} setRequests={setRequests} empty="Você ainda não enviou nenhuma solicitação." />}
         {tab === "security" && <form onSubmit={savePassword} className="grid gap-4"><Title text="Segurança" /><label>Senha atual<input name="current" type="password" className="field mt-2" required /></label><label>Nova senha<input name="next" type="password" minLength={6} className="field mt-2" required /></label><label>Confirmar nova senha<input name="confirm" type="password" minLength={6} className="field mt-2" required /></label><button className="rounded-xl bg-gold px-5 py-3 font-bold text-white">Alterar senha</button></form>}
       </section>
     </div>
-    <section className="mt-5 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm md:p-7"><RequestsPanel title="Histórico de Adoções" requests={requests.filter((request) => request.status === "completed" || request.status === "cancelled")} empty="Nenhum processo concluído ou encerrado." /></section>
+    <section className="mt-5 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm md:p-7"><RequestsPanel title="Histórico de Adoções" requests={requests.filter((request) => isFinalized(request.status))} setRequests={(updated) => setRequests((current) => current.filter((item) => !isFinalized(item.status) || updated.some((request) => request.id === item.id)))} empty="Nenhum processo concluído ou encerrado." /></section>
   </div></main>;
 }
 
@@ -73,4 +94,18 @@ function FavoritesPanel({ user }: { user: NonNullable<ReturnType<typeof useAuth>
 
   return <div><Title text="Pets Favoritos" />{favorites.length === 0 ? <p className="mt-5 text-stone-500">Você ainda não salvou nenhum pet.</p> : <div className="mt-5 grid gap-3">{favorites.map((item) => item.type === "pet" ? <div key={`${item.type}-${item.id}`} className="relative"><Link href={`/pets/${encodeURIComponent(item.id)}`} className="flex items-center gap-3 rounded-xl border border-stone-200 p-3 pr-14 hover:border-gold/50"><img src={item.imageUrl} alt={`Foto de ${item.name}`} className="h-14 w-14 rounded-lg object-cover" /><span className="font-semibold">{item.name}</span><ChevronRight className="ml-auto text-stone-400" size={17} /></Link><button type="button" onClick={(event) => void removeFavorite(item, event)} aria-label={`Remover ${item.name} dos favoritos`} className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full p-2 text-red-500 transition hover:bg-red-50" title="Remover dos favoritos">❤️</button></div> : <div key={`${item.type}-${item.id}`} className="flex items-center gap-3 rounded-xl border border-stone-200 p-3"><img src={item.imageUrl} alt={`Imagem de ${item.name}`} className="h-14 w-14 rounded-lg object-cover" /><span className="font-semibold">{item.name}</span></div>)}</div>}</div>;
 }
-function RequestsPanel({ title, requests, empty }: { title: string; requests: AdoptionRequest[]; empty: string }) { return <div><Title text={title} />{requests.length === 0 ? <p className="mt-5 text-stone-500">{empty}</p> : <div className="mt-5 space-y-3">{requests.map((request) => <article key={request.id} className="flex gap-4 rounded-2xl border border-stone-200 p-4"><img src={request.imageUrl ?? "/samples/placeholder.svg"} alt="" className="h-16 w-16 rounded-xl object-cover" /><div className="flex-1"><div className="flex justify-between gap-2"><p className="font-bold">{request.petName}</p><span className="rounded-full bg-gold/15 px-2 py-1 text-xs text-gold">{statusLabel(request.status)}</span></div><p className="mt-1 text-xs text-stone-500">Solicitado em {new Date(request.createdAt).toLocaleDateString("pt-BR")}</p></div></article>)}</div>}</div>; }
+function RequestsPanel({ title, requests, setRequests, empty }: { title: string; requests: AdoptionRequest[]; setRequests: (value: AdoptionRequest[]) => void; empty: string }) {
+  async function deleteRequest(request: AdoptionRequest, event: React.MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
+    if (!window.confirm("Excluir esta solicitação finalizada?")) return;
+    const previous = requests;
+    setRequests(requests.filter((item) => item.id !== request.id));
+    try {
+      await remove(ref(database, `solicitacoes/${request.id}`));
+    } catch (error) {
+      console.error("Não foi possível excluir a solicitação.", error);
+      setRequests(previous);
+    }
+  }
+  return <div><Title text={title} />{requests.length === 0 ? <p className="mt-5 text-stone-500">{empty}</p> : <div className="mt-5 space-y-3">{requests.map((request) => <article key={request.id} className="relative flex gap-4 rounded-2xl border border-stone-200 p-4"><img src={request.imageUrl || "/samples/placeholder.svg"} alt="" className="h-16 w-16 rounded-xl object-cover" /><div className="flex-1"><div className="flex justify-between gap-2"><p className="font-bold">{request.petName}</p><span className="rounded-full bg-gold/15 px-2 py-1 text-xs text-gold">{statusLabel(request.status)}</span></div><p className="mt-1 text-xs text-stone-500">Solicitado em {request.createdAt ? new Date(request.createdAt).toLocaleDateString("pt-BR") : "Data não informada"}</p></div>{isFinalized(request.status) && <button type="button" onClick={(event) => void deleteRequest(request, event)} aria-label="Excluir solicitação" className="absolute right-3 top-3 rounded-full px-2 py-1 text-lg text-stone-500 hover:bg-red-50 hover:text-red-600">×</button>}</article>)}</div>}</div>;
+}
