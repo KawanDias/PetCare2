@@ -16,12 +16,15 @@ export function NotificationBell() {
       setPendingCount(0);
       return;
     }
-    const unsubscribe = onValue(ref(database, "users"), (snapshot) => {
-      const users = snapshot.val() as Record<string, { adoptionRequests?: Record<string, { status?: string }> }> | null;
-      const count = Object.values(users ?? {}).reduce((total, user) => total + Object.values(user.adoptionRequests ?? {}).filter((request) => request.status === "pending" || request.status === "pendente").length, 0);
+    const unsubscribe = onValue(ref(database, "solicitacoes"), (snapshot) => {
+      const requests = snapshot.val() as Record<string, { status?: string }> | null;
+      const count = Object.values(requests ?? {}).filter((request) => {
+        const status = String(request.status ?? "pendente").trim().toLowerCase();
+        return status === "pending" || status === "pendente" || status === "em andamento";
+      }).length;
       setPendingCount(count);
     }, (error) => {
-      console.error("Não foi possível acompanhar as notificações de adoção.", error);
+      console.error("Não foi possível acompanhar as solicitações de adoção.", error);
       setPendingCount(0);
     });
     return unsubscribe;
