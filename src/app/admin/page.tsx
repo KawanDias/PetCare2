@@ -179,15 +179,15 @@ export default function AdminPage() {
     void apiFetch<Pet[]>("/api/pets")
       .then(setPets)
       .catch((error) => { console.error("Erro ao carregar pets do painel.", error); setMessage("Não foi possível carregar os pets."); });
+    void apiFetch<AdoptionRequest[]>("/api/adoptions")
+      .then((items) => setRequests(items.map((item) => normalizeAdoptionRequest(item.id, item as AdoptionRequest & Record<string, unknown>))))
+      .catch((error) => console.error("Erro ao carregar solicitações iniciais.", error));
     const requestsRef = ref(database, "solicitacoes");
     const unsubscribe = onValue(requestsRef, (snapshot) => {
       const data = snapshot.val() as Record<string, Partial<AdoptionRequest>> | null;
       setRequests(Object.entries(data ?? {}).map(([id, request]) => normalizeAdoptionRequest(id, request as Partial<AdoptionRequest> & Record<string, unknown>)));
     }, (error) => {
       console.error("Erro ao escutar solicitações em tempo real.", error);
-      void apiFetch<AdoptionRequest[]>("/api/adoptions")
-        .then(setRequests)
-        .catch((fallbackError) => { console.error("Erro ao carregar solicitações do painel.", fallbackError); setMessage("Não foi possível carregar as solicitações."); });
     });
     return unsubscribe;
   }, [role, user]);
