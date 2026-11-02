@@ -12,9 +12,9 @@ type AdoptionRequest = { id: string; petId: string; petName: string; imageUrl?: 
 const tabs: Array<[Tab, string, typeof UserRound]> = [["data", "Meus Dados", UserRound], ["address", "Endereço", MapPin], ["favorites", "Pets Favoritos", Heart], ["adoptions", "Minhas Solicitações", Heart], ["security", "Segurança", Shield]];
 const emptyAddress: UserAddress = { cep: "", street: "", number: "", neighborhood: "", city: "", reference: "" };
 const statusLabel = (status: string) => {
-  if (["approved", "aprovado", "adotado", "completed"].includes(status)) return "Aprovado / Adotado";
-  if (["negado", "recusado", "cancelled"].includes(status)) return "Negado";
-  return "Pendente / Em andamento";
+  if (["approved", "aprovado", "adotado", "completed"].includes(status)) return "Aceita";
+  if (["negado", "recusado", "cancelled"].includes(status)) return "Negada";
+  return "Em andamento";
 };
 const isFinalized = (status: string) => ["approved", "aprovado", "adotado", "completed", "negado", "recusado", "cancelled"].includes(status);
 
