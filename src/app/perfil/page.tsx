@@ -63,11 +63,10 @@ export default function ProfilePage() {
         {tab === "data" && <form onSubmit={saveProfile} className="grid gap-4 sm:grid-cols-2"><Title text="Meus Dados" /><label>Nome completo<input className="field mt-2" value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} required /></label><label>Telefone / WhatsApp<input className="field mt-2" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} /></label><label>CPF<input className="field mt-2" value={profile.cpf} onChange={(e) => setProfile({ ...profile, cpf: e.target.value })} /></label><label>Data de nascimento<input type="date" className="field mt-2" value={profile.birthDate} onChange={(e) => setProfile({ ...profile, birthDate: e.target.value })} /></label><button className="rounded-xl bg-gold px-5 py-3 font-bold text-white sm:col-span-2">Salvar alterações</button></form>}
         {tab === "address" && <AddressPanel address={address} setAddress={setAddress} onSave={saveAddress} />}
         {tab === "favorites" && <FavoritesPanel user={user} />}
-        {tab === "adoptions" && <RequestsPanel title="Minhas Solicitações" requests={requests} setRequests={setRequests} empty="Você ainda não enviou nenhuma solicitação." />}
+        {tab === "adoptions" && <RequestsPanel requests={requests} setRequests={setRequests} />}
         {tab === "security" && <form onSubmit={savePassword} className="grid gap-4"><Title text="Segurança" /><label>Senha atual<input name="current" type="password" className="field mt-2" required /></label><label>Nova senha<input name="next" type="password" minLength={6} className="field mt-2" required /></label><label>Confirmar nova senha<input name="confirm" type="password" minLength={6} className="field mt-2" required /></label><button className="rounded-xl bg-gold px-5 py-3 font-bold text-white">Alterar senha</button></form>}
       </section>
     </div>
-    <section className="mt-5 rounded-3xl border border-stone-200 bg-white p-5 shadow-sm md:p-7"><RequestsPanel title="Histórico de Adoções" requests={requests.filter((request) => isFinalized(request.status))} setRequests={(updated) => setRequests((current) => current.filter((item) => !isFinalized(item.status) || updated.some((request) => request.id === item.id)))} empty="Nenhum processo concluído ou encerrado." /></section>
   </div></main>;
 }
 
@@ -94,7 +93,12 @@ function FavoritesPanel({ user }: { user: NonNullable<ReturnType<typeof useAuth>
 
   return <div><Title text="Pets Favoritos" />{favorites.length === 0 ? <p className="mt-5 text-stone-500">Você ainda não salvou nenhum pet.</p> : <div className="mt-5 grid gap-3">{favorites.map((item) => item.type === "pet" ? <div key={`${item.type}-${item.id}`} className="relative"><Link href={`/pets/${encodeURIComponent(item.id)}`} className="flex items-center gap-3 rounded-xl border border-stone-200 p-3 pr-14 hover:border-gold/50"><img src={item.imageUrl} alt={`Foto de ${item.name}`} className="h-14 w-14 rounded-lg object-cover" /><span className="font-semibold">{item.name}</span><ChevronRight className="ml-auto text-stone-400" size={17} /></Link><button type="button" onClick={(event) => void removeFavorite(item, event)} aria-label={`Remover ${item.name} dos favoritos`} className="absolute right-3 top-1/2 z-10 -translate-y-1/2 rounded-full p-2 text-red-500 transition hover:bg-red-50" title="Remover dos favoritos">❤️</button></div> : <div key={`${item.type}-${item.id}`} className="flex items-center gap-3 rounded-xl border border-stone-200 p-3"><img src={item.imageUrl} alt={`Imagem de ${item.name}`} className="h-14 w-14 rounded-lg object-cover" /><span className="font-semibold">{item.name}</span></div>)}</div>}</div>;
 }
-function RequestsPanel({ title, requests, setRequests, empty }: { title: string; requests: AdoptionRequest[]; setRequests: (value: AdoptionRequest[]) => void; empty: string }) {
+function RequestsPanel({ requests, setRequests }: { requests: AdoptionRequest[]; setRequests: (value: AdoptionRequest[]) => void }) {
+  const [section, setSection] = useState<"active" | "finished">("active");
+  const activeRequests = requests.filter((request) => ["pendente", "pending", "em andamento"].includes(request.status));
+  const finishedRequests = requests.filter((request) => isFinalized(request.status));
+  const visibleRequests = section === "active" ? activeRequests : finishedRequests;
+
   async function deleteRequest(request: AdoptionRequest, event: React.MouseEvent<HTMLButtonElement>) {
     event.stopPropagation();
     if (!window.confirm("Excluir esta solicitação finalizada?")) return;
@@ -107,5 +111,16 @@ function RequestsPanel({ title, requests, setRequests, empty }: { title: string;
       setRequests(previous);
     }
   }
-  return <div><Title text={title} />{requests.length === 0 ? <p className="mt-5 text-stone-500">{empty}</p> : <div className="mt-5 space-y-3">{requests.map((request) => <article key={request.id} className="relative flex gap-4 rounded-2xl border border-stone-200 p-4"><img src={request.imageUrl || "/samples/placeholder.svg"} alt="" className="h-16 w-16 rounded-xl object-cover" /><div className="flex-1"><div className="flex justify-between gap-2"><p className="font-bold">{request.petName}</p><span className="rounded-full bg-gold/15 px-2 py-1 text-xs text-gold">{statusLabel(request.status)}</span></div><p className="mt-1 text-xs text-stone-500">Solicitado em {request.createdAt ? new Date(request.createdAt).toLocaleDateString("pt-BR") : "Data não informada"}</p></div>{isFinalized(request.status) && <button type="button" onClick={(event) => void deleteRequest(request, event)} aria-label="Excluir solicitação" className="absolute right-3 top-3 rounded-full px-2 py-1 text-lg text-stone-500 hover:bg-red-50 hover:text-red-600">×</button>}</article>)}</div>}</div>;
+  return <div>
+    <Title text="Minhas Solicitações" />
+    <div className="mt-5 flex flex-wrap gap-2" role="tablist" aria-label="Solicitações de adoção">
+      <button type="button" role="tab" aria-selected={section === "active"} onClick={() => setSection("active")} className={`rounded-xl px-4 py-3 text-sm font-semibold ${section === "active" ? "bg-gold text-white" : "border border-stone-200 text-stone-600"}`}>
+        Ativas ({activeRequests.length})
+      </button>
+      <button type="button" role="tab" aria-selected={section === "finished"} onClick={() => setSection("finished")} className={`rounded-xl px-4 py-3 text-sm font-semibold ${section === "finished" ? "bg-gold text-white" : "border border-stone-200 text-stone-600"}`}>
+        Finalizadas ({finishedRequests.length})
+      </button>
+    </div>
+    {visibleRequests.length === 0 ? <p className="mt-5 text-stone-500">{section === "active" ? "Você não possui solicitações ativas." : "Você não possui solicitações finalizadas."}</p> : <div className="mt-5 space-y-3">{visibleRequests.map((request) => <article key={request.id} className="relative flex gap-4 rounded-2xl border border-stone-200 p-4"><img src={request.imageUrl || "/samples/placeholder.svg"} alt="" className="h-16 w-16 rounded-xl object-cover" /><div className="flex-1"><div className="flex justify-between gap-2"><p className="font-bold">{request.petName}</p><span className="rounded-full bg-gold/15 px-2 py-1 text-xs text-gold">{statusLabel(request.status)}</span></div><p className="mt-1 text-xs text-stone-500">Solicitado em {request.createdAt ? new Date(request.createdAt).toLocaleDateString("pt-BR") : "Data não informada"}</p></div>{section === "finished" && <button type="button" onClick={(event) => void deleteRequest(request, event)} aria-label="Excluir solicitação finalizada" className="absolute right-3 top-3 rounded-full px-2 py-1 text-lg text-stone-500 hover:bg-red-50 hover:text-red-600">×</button>}</article>)}</div>}
+  </div>;
 }
