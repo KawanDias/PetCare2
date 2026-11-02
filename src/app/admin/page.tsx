@@ -103,6 +103,10 @@ function petToFormData(pet: Pet & Record<string, unknown>): PetFormData {
   };
 }
 
+function getPetId(pet: Pet & { key?: string }) {
+  return String(pet.id || pet.key || "").trim();
+}
+
 export default function AdminPage() {
   const { user, role, loading } = useAuth();
   const router = useRouter();
@@ -114,7 +118,7 @@ export default function AdminPage() {
   const [message, setMessage] = useState("");
   const [selectedImages, setSelectedImages] = useState<File[]>([]);
   const [formData, setFormData] = useState<PetFormData>(emptyFormData);
-  const editing = pets.find((pet) => pet.id === editingId);
+  const editing = pets.find((pet) => getPetId(pet) === editingId);
 
   useEffect(() => {
     setFormData(editing ? petToFormData(editing as Pet & Record<string, unknown>) : emptyFormData);
@@ -154,6 +158,18 @@ export default function AdminPage() {
     setMessage(files.length ? `${files.length} imagem(ns) selecionada(s).` : "");
   }
 
+  function startEditing(pet: Pet) {
+    const petId = getPetId(pet);
+    if (!petId) {
+      setMessage("Não foi possível identificar o pet para edição.");
+      return;
+    }
+    setEditingId(petId);
+    setFormData(petToFormData(pet as Pet & Record<string, unknown>));
+    setSelectedImages([]);
+    setActiveTab("create");
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
@@ -173,10 +189,13 @@ export default function AdminPage() {
         description: String(data.get("description") ?? "").trim(), imageUrls: images, images, image: images[0],
         emDestaque: data.get("emDestaque") === "on", status: editing?.status ?? "disponivel"
       };
-      const saved = editingId
-        ? await apiFetch<Pet>(`/api/pets/${encodeURIComponent(editingId)}`, { method: "PUT", body: JSON.stringify(pet) })
+      const selectedPetId = editingId;
+      const saved = selectedPetId
+        ? await apiFetch<Pet>(`/api/pets/${encodeURIComponent(selectedPetId)}`, { method: "PUT", body: JSON.stringify({ ...pet, id: selectedPetId }) })
         : await apiFetch<Pet>("/api/pets", { method: "POST", body: JSON.stringify(pet) });
-      setPets((items) => editingId ? items.map((item) => item.id === saved.id ? saved : item) : [...items, saved]);
+      setPets((items) => selectedPetId
+        ? items.map((item) => getPetId(item) === selectedPetId ? { ...saved, id: selectedPetId } : item)
+        : [...items, saved]);
       setEditingId(null);
       setSelectedImages([]);
       form.reset();
@@ -261,7 +280,7 @@ export default function AdminPage() {
       <nav className="mt-6 flex flex-wrap gap-2" aria-label="Navegação do painel"><TabButton active={activeTab === "pets"} onClick={() => setActiveTab("pets")}><PawPrint size={17} />Gerenciar pets</TabButton><TabButton active={activeTab === "create"} onClick={() => { setEditingId(null); setActiveTab("create"); }}><Plus size={17} />Cadastrar pet</TabButton><TabButton active={activeTab === "adoptions"} onClick={() => setActiveTab("adoptions")}><Inbox size={17} />Solicitações de adoção{pendingRequests.length > 0 && <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs text-white">{pendingRequests.length}</span>}</TabButton></nav>
     </header>
     {message && <p role="status" className="mt-5 rounded-xl border border-gold/30 bg-gold/10 p-3 text-sm text-gold">{message}</p>}
-    {activeTab === "pets" && <section className="mt-6 rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-6"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-sans text-2xl uppercase">Pets cadastrados</h2><p className="text-sm text-stone-500">{filteredPets.length} resultado(s)</p></div><div className="relative sm:max-w-xs"><Search size={17} className="absolute left-3 top-3 text-stone-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar por nome" className="field pl-10" /></div></div><div className="mt-5 grid gap-3">{filteredPets.map((pet) => <div key={pet.id} role="link" tabIndex={0} onClick={() => router.push(`/pets/${encodeURIComponent(pet.id)}`)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); router.push(`/pets/${encodeURIComponent(pet.id)}`); } }} className="flex cursor-pointer flex-wrap items-center gap-3 rounded-2xl border border-stone-200 bg-white p-3"><img src={pet.imageUrls[0]} alt={`Foto de ${pet.name}`} className="h-14 w-14 rounded-xl object-cover" /><div className="min-w-0 flex-1"><p className="truncate font-semibold">{pet.name}</p><p className="text-sm text-stone-500">{pet.species} · {pet.breed} · {pet.age}</p>{pet.status === "adotado" && <span className="text-xs font-semibold text-green-700">Adotado</span>}{pet.status !== "adotado" && pet.emDestaque && <span className="inline-flex items-center gap-1 text-xs text-gold"><Check size={12} /> Em destaque</span>}</div>{pet.status !== "adotado" && <button title="Marcar como adotado" onClick={(event) => { event.stopPropagation(); void markAsAdopted(pet); }} className="min-h-11 rounded-xl border border-green-300 px-3 text-xs text-green-700 hover:bg-green-50">Marcar como adotado</button>}<button title="Editar" onClick={(event) => { event.stopPropagation(); setEditingId(pet.id); setActiveTab("create"); }} className="min-h-11 min-w-11 text-stone-500 hover:text-gold"><Edit3 size={17} /></button><button title="Excluir" onClick={(event) => { event.stopPropagation(); void removePet(pet); }} className="min-h-11 min-w-11 text-stone-500 hover:text-red-400"><Trash2 size={17} /></button></div>)}{filteredPets.length === 0 && <p className="text-sm text-stone-600">Nenhum pet cadastrado.</p>}</div></section>}
+    {activeTab === "pets" && <section className="mt-6 rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-6"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="font-sans text-2xl uppercase">Pets cadastrados</h2><p className="text-sm text-stone-500">{filteredPets.length} resultado(s)</p></div><div className="relative sm:max-w-xs"><Search size={17} className="absolute left-3 top-3 text-stone-500" /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pesquisar por nome" className="field pl-10" /></div></div><div className="mt-5 grid gap-3">{filteredPets.map((pet) => { const petId = getPetId(pet); return <div key={petId} role="link" tabIndex={0} onClick={() => router.push(`/pets/${encodeURIComponent(petId)}`)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); router.push(`/pets/${encodeURIComponent(petId)}`); } }} className="flex cursor-pointer flex-wrap items-center gap-3 rounded-2xl border border-stone-200 bg-white p-3"><img src={pet.imageUrls[0]} alt={`Foto de ${pet.name}`} className="h-14 w-14 rounded-xl object-cover" /><div className="min-w-0 flex-1"><p className="truncate font-semibold">{pet.name}</p><p className="text-sm text-stone-500">{pet.species} · {pet.breed} · {pet.age}</p>{pet.status === "adotado" && <span className="text-xs font-semibold text-green-700">Adotado</span>}{pet.status !== "adotado" && pet.emDestaque && <span className="inline-flex items-center gap-1 text-xs text-gold"><Check size={12} /> Em destaque</span>}</div>{pet.status !== "adotado" && <button title="Marcar como adotado" onClick={(event) => { event.stopPropagation(); void markAsAdopted(pet); }} className="min-h-11 rounded-xl border border-green-300 px-3 text-xs text-green-700 hover:bg-green-50">Marcar como adotado</button>}<button title="Editar" onClick={(event) => { event.stopPropagation(); startEditing(pet); }} className="min-h-11 min-w-11 text-stone-500 hover:text-gold"><Edit3 size={17} /></button><button title="Excluir" onClick={(event) => { event.stopPropagation(); void removePet(pet); }} className="min-h-11 min-w-11 text-stone-500 hover:text-red-400"><Trash2 size={17} /></button></div>; })}{filteredPets.length === 0 && <p className="text-sm text-stone-600">Nenhum pet cadastrado.</p>}</div></section>}
     {activeTab === "create" && <form key={editingId ?? "new"} onSubmit={save} className="mx-auto mt-6 grid max-w-3xl gap-3 rounded-3xl border border-stone-200 bg-stone-100 p-4 sm:p-6"><h2 className="font-sans text-2xl uppercase">{editing ? "Atualizar pet" : "Cadastrar pet"}</h2>{field("name", "Nome do pet")}{select("species", "Espécie", choices.species)}{field("breed", "Raça (ex.: SRD / Vira-lata)")}{field("age", "Idade (ex.: 2 anos)")}{select("size", "Porte", choices.size)}{select("sex", "Sexo", choices.sex)}{field("coat", "Cor / Pelagem")}<div className="grid gap-3 sm:grid-cols-3">{select("vaccinated", "Vacinado?", choices.yesNo)}{select("neutered", "Castrado?", choices.yesNo)}{select("dewormed", "Vermifugado?", choices.yesNo)}</div>{field("temperament", "Personalidade / Temperamento")}<textarea name="description" value={formData.description} onChange={handleChange} placeholder="História / descrição detalhada" className="field min-h-28 w-full" required /><input name="images" type="file" accept="image/*" multiple onChange={handleImageChange} className="field w-full text-sm" />{selectedImages.length > 0 && <p className="text-xs text-gold">{selectedImages.length} imagem(ns) pronta(s) para envio.</p>}<p className="text-xs text-stone-500">Selecione de 1 a 5 fotos. As imagens são armazenadas em Base64.</p><label className="flex min-h-11 items-center gap-2 text-sm text-stone-600"><input name="emDestaque" type="checkbox" checked={formData.emDestaque} onChange={(event) => setFormData((current) => ({ ...current, emDestaque: event.target.checked }))} /> Em destaque na Home</label><Button className="min-h-11 w-full">{editing ? "Atualizar pet" : "Cadastrar pet"}</Button>{editing && <button type="button" onClick={() => setEditingId(null)} className="min-h-11 rounded-xl border border-stone-300 px-4 py-3 text-sm text-stone-600">Cancelar edição</button>}</form>}
     {activeTab === "adoptions" && <AdoptionsPanel requests={requests} pendingRequests={pendingRequests} onMarkAdopted={(request) => void markRequestAdopted(request)} onDeny={(request) => void updateRequestStatus(request, "negado")} />}
   </div></main>;
