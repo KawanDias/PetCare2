@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/Button";
 import { Pet } from "@/lib/catalog-data";
 import { apiFetch } from "@/lib/api";
 import { NotificationBell } from "@/components/NotificationBell";
+import { database } from "@/lib/firebase";
+import { onValue, ref } from "firebase/database";
 
 function fileToBase64(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -133,9 +135,17 @@ export default function AdminPage() {
     void apiFetch<Pet[]>("/api/pets")
       .then(setPets)
       .catch((error) => { console.error("Erro ao carregar pets do painel.", error); setMessage("Não foi possível carregar os pets."); });
-    void apiFetch<AdoptionRequest[]>("/api/adoptions")
-      .then(setRequests)
-      .catch((error) => { console.error("Erro ao carregar solicitações do painel.", error); setMessage("Não foi possível carregar as solicitações."); });
+    const requestsRef = ref(database, "solicitacoes");
+    const unsubscribe = onValue(requestsRef, (snapshot) => {
+      const data = snapshot.val() as Record<string, Partial<AdoptionRequest>> | null;
+      setRequests(Object.entries(data ?? {}).map(([id, request]) => ({ ...request, id })) as AdoptionRequest[]);
+    }, (error) => {
+      console.error("Erro ao escutar solicitações em tempo real.", error);
+      void apiFetch<AdoptionRequest[]>("/api/adoptions")
+        .then(setRequests)
+        .catch((fallbackError) => { console.error("Erro ao carregar solicitações do painel.", fallbackError); setMessage("Não foi possível carregar as solicitações."); });
+    });
+    return unsubscribe;
   }, [role, user]);
 
   useEffect(() => {
