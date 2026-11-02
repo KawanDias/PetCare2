@@ -46,6 +46,7 @@ type PetFormData = {
 
 type AdoptionRequest = {
   id: string;
+  excluidoPeloUsuario?: boolean;
   userId?: string;
   petId: string;
   petNome?: string;
@@ -179,9 +180,6 @@ export default function AdminPage() {
     void apiFetch<Pet[]>("/api/pets")
       .then(setPets)
       .catch((error) => { console.error("Erro ao carregar pets do painel.", error); setMessage("Não foi possível carregar os pets."); });
-    void apiFetch<AdoptionRequest[]>("/api/adoptions")
-      .then((items) => setRequests(items.map((item) => normalizeAdoptionRequest(item.id, item as AdoptionRequest & Record<string, unknown>))))
-      .catch((error) => console.error("Erro ao carregar solicitações iniciais.", error));
     const requestsRef = ref(database, "solicitacoes");
     const unsubscribe = onValue(requestsRef, (snapshot) => {
       const data = snapshot.val() as Record<string, Partial<AdoptionRequest>> | null;

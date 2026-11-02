@@ -5,10 +5,10 @@ import { FormEvent, useEffect, useState } from "react";
 import { Check, ChevronRight, Heart, Home, LogOut, MapPin, Shield, UserRound } from "lucide-react";
 import { useAuth, type UserAddress } from "@/components/AuthProvider";
 import { database } from "@/lib/firebase";
-import { equalTo, onValue, orderByChild, ref, remove, query } from "firebase/database";
+import { equalTo, onValue, orderByChild, ref, update, query } from "firebase/database";
 
 type Tab = "data" | "address" | "favorites" | "adoptions" | "security";
-type AdoptionRequest = { id: string; petId: string; petName: string; imageUrl?: string; status: string; createdAt: string };
+type AdoptionRequest = { id: string; petId: string; petName: string; imageUrl?: string; status: string; createdAt: string; excluidoPeloUsuario?: boolean };
 const tabs: Array<[Tab, string, typeof UserRound]> = [["data", "Meus Dados", UserRound], ["address", "Endereço", MapPin], ["favorites", "Pets Favoritos", Heart], ["adoptions", "Minhas Solicitações", Heart], ["security", "Segurança", Shield]];
 const emptyAddress: UserAddress = { cep: "", street: "", number: "", neighborhood: "", city: "", reference: "" };
 const statusLabel = (status: string) => {
@@ -33,14 +33,15 @@ export default function ProfilePage() {
     const requestsQuery = query(ref(database, "solicitacoes"), orderByChild("userId"), equalTo(user.uid));
     const unsubscribe = onValue(requestsQuery, (snapshot) => {
       const data = snapshot.val() as Record<string, Record<string, unknown>> | null;
-      setRequests(Object.entries(data ?? {}).map(([id, value]) => ({
-        id,
-        petId: String(value.petId ?? ""),
-        petName: String(value.petNome ?? value.petName ?? "Pet"),
-        imageUrl: String(value.petFoto ?? value.imageUrl ?? ""),
-        status: String(value.status ?? "pendente").toLowerCase(),
-        createdAt: String(value.dataCriacao ?? value.createdAt ?? "")
-      })));
+      setRequests(Object.entries(data ?? {}).filter(([, value]) => value.excluidoPeloUsuario !== true).map(([id, value]) => ({
+          id,
+          petId: String(value.petId ?? ""),
+          petName: String(value.petNome ?? value.petName ?? "Pet"),
+          imageUrl: String(value.petFoto ?? value.imageUrl ?? ""),
+          status: String(value.status ?? "pendente").toLowerCase(),
+          createdAt: String(value.dataCriacao ?? value.createdAt ?? ""),
+          excluidoPeloUsuario: value.excluidoPeloUsuario === true
+        })));
     }, (error) => {
       console.error("Erro ao carregar solicitações do usuário.", error);
       setNotice("Não foi possível carregar suas solicitações.");
@@ -105,7 +106,7 @@ function RequestsPanel({ requests, setRequests }: { requests: AdoptionRequest[];
     const previous = requests;
     setRequests(requests.filter((item) => item.id !== request.id));
     try {
-      await remove(ref(database, `solicitacoes/${request.id}`));
+      await update(ref(database, `solicitacoes/${request.id}`), { excluidoPeloUsuario: true });
     } catch (error) {
       console.error("Não foi possível excluir a solicitação.", error);
       setRequests(previous);
