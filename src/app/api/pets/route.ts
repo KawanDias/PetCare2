@@ -16,7 +16,7 @@ export async function GET() {
     if (value !== null && (typeof value !== "object" || Array.isArray(value))) {
       throw new ApiError(502, "Resposta inválida do Realtime Database.");
     }
-    return Response.json(Object.entries(value ?? {}).map(([id, pet]) => ({ id, ...pet, status: pet.status ?? "disponivel" })), { status: 200 });
+    return Response.json(Object.entries(value ?? {}).map(([id, pet]) => ({ ...pet, id, status: pet.status ?? "disponivel" })), { status: 200 });
   } catch (error) {
     return jsonError(error);
   }
